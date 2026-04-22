@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Now Playing Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:transparent;overflow:hidden;height:100vh;display:flex;align-items:flex-start;padding:20px}
+
+.np-widget {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(13, 14, 20, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 16px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  transform: translateX(-120%);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+  opacity: 0;
+  max-width: 400px;
+}
+.np-widget.show {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.np-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #25f4ee, #fe2c55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  animation: spin 4s linear infinite;
+}
+.np-icon.paused {
+  animation: none;
+  background: rgba(255,255,255,0.2);
+}
+
+.np-info {
+  flex: 1;
+  overflow: hidden;
+}
+.np-label {
+  font-size: 10px;
+  color: #a0a8c0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+.np-song {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.np-req {
+  font-size: 11px;
+  color: #25f4ee;
+  margin-top: 2px;
+}
+
+/* THEMES */
+body.dark   .np-widget{background:rgba(13,14,20,.85);border-color:rgba(255,255,255,.08);}
+body.light  .np-widget{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.08);color:#111}
+body.light  .np-label{color:#666}
+body.light  .np-req{color:#fe2c55}
+body.neon   .np-widget{background:rgba(0,15,8,.85);border-color:#00ff88;color:#00ff88}
+body.neon   .np-req{color:#fff}
+body.glass  .np-widget{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);backdrop-filter:blur(12px);}
+body.minimal .np-widget{background:rgba(0,0,0,.7);border-left:3px solid #fff;border-radius:4px;}
+body.pink   .np-widget{background:rgba(60,0,35,.85);border-color:rgba(255,100,150,.2);color:#ffcce0}
+body.pink   .np-req{color:#ff6496}
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+</style>
+</head>
+<body class="dark" id="overlayBody">
+
+<div class="np-widget" id="npWidget">
+  <div class="np-icon" id="npIcon">🎵</div>
+  <div class="np-info">
+    <div class="np-label">Now Playing</div>
+    <div class="np-song" id="npSong">Judul Lagu</div>
+    <div class="np-req" id="npReq">Req: @user</div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let currentTheme = 'dark';
+
+socket.on('init', d => {
+  if(d.settings?.overlayTheme) applyTheme(d.settings.overlayTheme);
+  updateWidget(d.nowPlaying);
+});
+socket.on('settings', s => {
+  if(s.overlayTheme) applyTheme(s.overlayTheme);
+});
+socket.on('songQueue', data => {
+  updateWidget(data.nowPlaying);
+});
+
+function applyTheme(t) {
+  document.getElementById('overlayBody').className = t;
+}
+
+function updateWidget(nowPlaying) {
+  const widget = document.getElementById('npWidget');
+  const icon = document.getElementById('npIcon');
+  const song = document.getElementById('npSong');
+  const req = document.getElementById('npReq');
+
+  if (nowPlaying) {
+    song.textContent = nowPlaying.song;
+    req.textContent = 'Req: @' + (nowPlaying.requesterNick || nowPlaying.requester);
+    icon.classList.remove('paused');
+    widget.classList.add('show');
+  } else {
+    widget.classList.remove('show');
+    icon.classList.add('paused');
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>SociaBuzz QR Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:transparent;overflow:hidden;height:100vh;display:flex;align-items:flex-end;justify-content:flex-end;padding:20px}
+
+.qr-widget {
+  background: rgba(13, 14, 20, 0.9);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  padding: 16px;
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  color: #fff;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255, 193, 7, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 220px;
+  text-align: center;
+  animation: slideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.qr-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 16px;
+  color: #ffc107; /* SociaBuzz Yellow */
+  letter-spacing: 0.5px;
+}
+.qr-header img {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+.qr-img-wrapper {
+  background: #fff;
+  padding: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+.qr-img-wrapper img {
+  width: 150px;
+  height: 150px;
+  display: block;
+}
+
+.qr-footer {
+  font-size: 12px;
+  color: #a0a8c0;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.qr-footer strong {
+  color: #fff;
+  display: block;
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+/* THEMES */
+body.light  .qr-widget { background:rgba(255,255,255,0.95); border-color:rgba(0,0,0,0.1); color:#111; }
+body.light  .qr-header { color:#f5a623; }
+body.light  .qr-footer { color:#666; }
+body.light  .qr-footer strong { color:#111; }
+
+body.glass  .qr-widget { background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); backdrop-filter:blur(20px); }
+
+@keyframes slideIn { from{ opacity:0; transform:translateY(20px) scale(0.95); } to{ opacity:1; transform:translateY(0) scale(1); } }
+
+</style>
+</head>
+<body class="dark" id="overlayBody">
+
+<div class="qr-widget" id="qrWidget" style="display:none">
+  <div class="qr-header">
+    ⭐ Dukung Saya!
+  </div>
+  <div class="qr-img-wrapper">
+    <img id="qrImg" src="" alt="QR Code">
+  </div>
+  <div class="qr-footer">
+    Scan untuk Donate via <strong>SociaBuzz</strong>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+
+socket.on('init', d => {
+  if(d.settings) applySettings(d.settings);
+});
+socket.on('settings', s => {
+  applySettings(s);
+});
+
+function applySettings(s) {
+  if(s.overlayTheme) {
+    document.getElementById('overlayBody').className = s.overlayTheme;
+  }
+  
+  if(s.sociaBuzzUrl && s.sociaBuzzUrl.trim() !== '') {
+    let url = s.sociaBuzzUrl.trim();
+    // Auto format if user only enters username
+    if(!url.includes('http') && !url.includes('sociabuzz.com')) {
+      url = `https://sociabuzz.com/${url}/tribe`;
+    }
+    document.getElementById('qrImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}&margin=0`;
+    document.getElementById('qrWidget').style.display = 'flex';
+  } else {
+    document.getElementById('qrWidget').style.display = 'none';
+  }
+}
+</script>
+</body>
+</html>

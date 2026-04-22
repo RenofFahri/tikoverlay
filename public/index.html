@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TikTok Live Bot v2 — Dashboard</title>
+  <meta name="description" content="TikTok Live Bot dashboard with TTS, gift leaderboard, gift goals, song requests, and overlay links">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  HEADER                                        -->
+  <!-- ══════════════════════════════════════════════ -->
+  <header class="header" id="mainHeader">
+    <div class="header-brand">
+      <div class="brand-logo">
+        <i class="fab fa-tiktok"></i>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">TikTok Live Bot</span>
+        <span class="brand-ver">v2.0</span>
+      </div>
+    </div>
+
+    <div class="header-connect">
+      <div class="connect-box">
+        <span class="at-sign">@</span>
+        <input type="text" id="usernameInput" class="username-input" placeholder="username tiktok..." autocomplete="off">
+        <button id="connectBtn" class="btn btn-connect">
+          <i class="fas fa-plug"></i> Connect
+        </button>
+        <button id="disconnectBtn" class="btn btn-disconnect hidden">
+          <i class="fas fa-stop"></i> Stop
+        </button>
+      </div>
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Offline</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button class="icon-btn" id="ttsToggleBtn" title="Toggle TTS">
+        <i class="fas fa-volume-up"></i>
+      </button>
+      <button class="icon-btn" id="fullscreenBtn" title="Fullscreen">
+        <i class="fas fa-expand"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  STATS BAR                                     -->
+  <!-- ══════════════════════════════════════════════ -->
+  <section class="stats-bar" id="statsBar">
+    <div class="stat-card">
+      <div class="stat-icon viewers"><i class="fas fa-eye"></i></div>
+      <div class="stat-info">
+        <span class="stat-value" id="statViewers">0</span>
+        <span class="stat-label">Viewers</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon likes"><i class="fas fa-heart"></i></div>
+      <div class="stat-info">
+        <span class="stat-value" id="statLikes">0</span>
+        <span class="stat-label">Likes</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon follows"><i class="fas fa-user-plus"></i></div>
+      <div class="stat-info">
+        <span class="stat-value" id="statFollows">0</span>
+        <span class="stat-label">Follows</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon shares"><i class="fas fa-share-alt"></i></div>
+      <div class="stat-info">
+        <span class="stat-value" id="statShares">0</span>
+        <span class="stat-label">Shares</span>
+      </div>
+    </div>
+    <div class="stat-card gift-goal-card">
+      <div class="stat-icon diamonds"><i class="fas fa-gem"></i></div>
+      <div class="stat-info full-width">
+        <div class="goal-header">
+          <span class="stat-value" id="statGoalCurrent">0</span>
+          <span class="goal-sep">/</span>
+          <span class="stat-value goal-target" id="statGoalTarget">1000</span>
+          <span class="stat-label" id="statGoalLabel">Gift Goal</span>
+        </div>
+        <div class="goal-bar-wrap">
+          <div class="goal-bar" id="goalBar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  OVERLAY CARDS                                 -->
+  <!-- ══════════════════════════════════════════════ -->
+  <section class="overlay-cards" id="overlayLinks">
+    <div class="overlay-card" id="olChat">
+      <div class="overlay-card-icon chat-icon"><i class="fas fa-comments"></i></div>
+      <div class="overlay-card-info">
+        <div class="overlay-card-title">Chat Overlay</div>
+        <div class="overlay-card-url" id="olChatUrl"></div>
+      </div>
+      <div class="overlay-card-actions">
+        <button class="oc-btn preview" onclick="previewOverlay('chat','Chat Overlay')" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+        <button class="oc-btn copy" onclick="copyOverlay('chat')" title="Copy URL"><i class="far fa-copy"></i> Copy</button>
+        <a class="oc-btn open" id="olChatOpen" href="#" target="_blank" title="Buka di tab baru"><i class="fas fa-external-link-alt"></i></a>
+      </div>
+    </div>
+    <div class="overlay-card" id="olGift">
+      <div class="overlay-card-icon gift-icon"><i class="fas fa-gift"></i></div>
+      <div class="overlay-card-info">
+        <div class="overlay-card-title">Gift Alert Overlay</div>
+        <div class="overlay-card-url" id="olGiftUrl"></div>
+      </div>
+      <div class="overlay-card-actions">
+        <button class="oc-btn preview" onclick="previewOverlay('gift','Gift Alert Overlay')" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+        <button class="oc-btn copy" onclick="copyOverlay('gift')" title="Copy URL"><i class="far fa-copy"></i> Copy</button>
+        <a class="oc-btn open" id="olGiftOpen" href="#" target="_blank" title="Buka di tab baru"><i class="fas fa-external-link-alt"></i></a>
+      </div>
+    </div>
+    <div class="overlay-card" id="olLeaderboard">
+      <div class="overlay-card-icon lb-icon"><i class="fas fa-crown"></i></div>
+      <div class="overlay-card-info">
+        <div class="overlay-card-title">Leaderboard Overlay</div>
+        <div class="overlay-card-url" id="olLeaderboardUrl"></div>
+      </div>
+      <div class="overlay-card-actions">
+        <button class="oc-btn preview" onclick="previewOverlay('leaderboard','Leaderboard Overlay')" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+        <button class="oc-btn copy" onclick="copyOverlay('leaderboard')" title="Copy URL"><i class="far fa-copy"></i> Copy</button>
+        <a class="oc-btn open" id="olLeaderboardOpen" href="#" target="_blank" title="Buka di tab baru"><i class="fas fa-external-link-alt"></i></a>
+      </div>
+    </div>
+    <div class="overlay-card" id="olSong">
+      <div class="overlay-card-icon" style="color:var(--accent2);background:rgba(37,244,238,0.15)"><i class="fas fa-music"></i></div>
+      <div class="overlay-card-info">
+        <div class="overlay-card-title">Now Playing Overlay</div>
+        <div class="overlay-card-url" id="olSongUrl"></div>
+      </div>
+      <div class="overlay-card-actions">
+        <button class="oc-btn preview" onclick="previewOverlay('song.html','Now Playing Overlay', true)" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+        <button class="oc-btn copy" onclick="copyOverlay('song.html', true)" title="Copy URL"><i class="far fa-copy"></i> Copy</button>
+        <a class="oc-btn open" id="olSongOpen" href="#" target="_blank" title="Buka di tab baru"><i class="fas fa-external-link-alt"></i></a>
+      </div>
+    </div>
+    <div class="overlay-card" id="olQr">
+      <div class="overlay-card-icon" style="color:#ffc107;background:rgba(255,193,7,0.15)"><i class="fas fa-qrcode"></i></div>
+      <div class="overlay-card-info">
+        <div class="overlay-card-title">Donation QR Overlay</div>
+        <div class="overlay-card-url" id="olQrUrl"></div>
+      </div>
+      <div class="overlay-card-actions">
+        <button class="oc-btn preview" onclick="previewOverlay('qr.html','Donation QR Overlay', true)" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+        <button class="oc-btn copy" onclick="copyOverlay('qr.html', true)" title="Copy URL"><i class="far fa-copy"></i> Copy</button>
+        <a class="oc-btn open" id="olQrOpen" href="#" target="_blank" title="Buka di tab baru"><i class="fas fa-external-link-alt"></i></a>
+      </div>
+    </div>
+    <div class="overlay-card" id="olGoal">
+      <div class="overlay-card-icon" style="color:var(--accent);background:rgba(254,44,85,0.15)"><i class="fas fa-bullseye"></i></div>
+      <div class="overlay-card-info">
+        <div class="overlay-card-title">Gift Goal Overlay</div>
+        <div class="overlay-card-url" id="olGoalUrl"></div>
+      </div>
+      <div class="overlay-card-actions">
+        <button class="oc-btn preview" onclick="previewOverlay('goal.html','Gift Goal Overlay', true)" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+        <button class="oc-btn copy" onclick="copyOverlay('goal.html', true)" title="Copy URL"><i class="far fa-copy"></i> Copy</button>
+        <a class="oc-btn open" id="olGoalOpen" href="#" target="_blank" title="Buka di tab baru"><i class="fas fa-external-link-alt"></i></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  PREVIEW MODAL                                 -->
+  <!-- ══════════════════════════════════════════════ -->
+  <div class="preview-modal" id="previewModal">
+    <div class="preview-modal-inner">
+      <div class="preview-modal-header">
+        <span id="previewModalTitle">Preview</span>
+        <div class="preview-modal-actions">
+          <button class="oc-btn preview" id="previewTestBtn" style="display:none;background:var(--accent);color:#fff"><i class="fas fa-play"></i> Test Alert</button>
+          <span class="preview-size-hint">Transparent background = normal untuk OBS</span>
+          <button class="oc-btn copy" id="previewCopyBtn"><i class="far fa-copy"></i> Copy URL</button>
+          <a class="oc-btn open" id="previewOpenBtn" href="#" target="_blank"><i class="fas fa-external-link-alt"></i> Buka Tab</a>
+          <button class="preview-close" id="previewCloseBtn"><i class="fas fa-times"></i></button>
+        </div>
+      </div>
+      <div class="preview-body">
+        <div class="preview-settings" id="previewSettings" style="display:none">
+          <div class="ps-title"><i class="fas fa-sliders-h"></i> Pengaturan <span id="psOverlayName">Chat Overlay</span></div>
+          <div class="ps-group">
+            <label class="ps-label">Tema</label>
+            <select id="psTheme" class="tb-input">
+              <option value="dark">🌑 Dark</option>
+              <option value="light">☀️ Light</option>
+              <option value="neon">💚 Neon</option>
+              <option value="glass">🔮 Glass</option>
+              <option value="minimal">⬛ Minimal</option>
+              <option value="pink">🌸 Pink</option>
+            </select>
+          </div>
+          
+          <div id="psChatSettings">
+            <div class="ps-group mt-2">
+              <label class="ps-label">Ukuran Font</label>
+              <select id="psFontSize" class="tb-input">
+                <option value="12">Kecil (12px)</option>
+                <option value="14" selected>Normal (14px)</option>
+                <option value="16">Besar (16px)</option>
+                <option value="18">Lebih Besar (18px)</option>
+                <option value="20">Ekstra Besar (20px)</option>
+              </select>
+            </div>
+            <div class="ps-group">
+              <label class="ps-label">Max Pesan di Overlay</label>
+              <select id="psChatMax" class="tb-input">
+                <option value="5">5 pesan</option>
+                <option value="10">10 pesan</option>
+                <option value="15">15 pesan</option>
+                <option value="20">20 pesan</option>
+                <option value="30" selected>30 pesan</option>
+                <option value="50">50 pesan</option>
+              </select>
+            </div>
+            <div class="ps-group">
+              <label class="ps-label">Tampilkan Event</label>
+              <label class="toggle-label sm"><input type="checkbox" id="psShowChat" checked><span>💬 Chat</span></label>
+              <label class="toggle-label sm"><input type="checkbox" id="psShowJoin" checked><span>👋 Join</span></label>
+              <label class="toggle-label sm"><input type="checkbox" id="psShowFollow" checked><span>❤️ Follow</span></label>
+            </div>
+            <div class="ps-group">
+              <label class="ps-label">Animasi Masuk</label>
+              <select id="psAnimation" class="tb-input">
+                <option value="slideUp" selected>Slide Up</option>
+                <option value="fadeIn">Fade In</option>
+                <option value="popIn">Pop In</option>
+                <option value="slideLeft">Slide Left</option>
+              </select>
+            </div>
+            <div class="ps-group">
+              <label class="ps-label">Posisi Chat</label>
+              <select id="psPosition" class="tb-input">
+                <option value="bottom" selected>Bawah ke Atas</option>
+                <option value="top">Atas ke Bawah</option>
+              </select>
+            </div>
+            <div class="ps-group ps-row">
+              <div>
+                <label class="ps-label">Avatar</label>
+                <label class="switch"><input type="checkbox" id="psShowAvatar" checked><span class="slider"></span></label>
+              </div>
+              <div>
+                <label class="ps-label">Badge</label>
+                <label class="switch"><input type="checkbox" id="psShowBadge" checked><span class="slider"></span></label>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary w100 mt-2" id="psApplyBtn"><i class="fas fa-check"></i> Terapkan Tema/Settings</button>
+          <p class="ps-note">Perubahan langsung aktif di overlay via Socket.IO</p>
+        </div>
+        <div class="preview-frame-wrap">
+          <iframe id="previewFrame" src="" frameborder="0" allowtransparency="true"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  TABS + CONTENT                                -->
+  <!-- ══════════════════════════════════════════════ -->
+  <main class="main-content">
+    <nav class="tabs" id="mainTabs" role="tablist">
+      <button class="tab-btn active" data-tab="chat" role="tab"><i class="fas fa-comments"></i> Chat</button>
+      <button class="tab-btn" data-tab="gifts" role="tab"><i class="fas fa-gift"></i> Gifts</button>
+      <button class="tab-btn" data-tab="songs" role="tab"><i class="fas fa-music"></i> Song Queue</button>
+      <button class="tab-btn" data-tab="leaderboard" role="tab"><i class="fas fa-crown"></i> Leaderboard</button>
+      <button class="tab-btn" data-tab="commands" role="tab"><i class="fas fa-terminal"></i> Bot Commands</button>
+      <button class="tab-btn" data-tab="settings" role="tab"><i class="fas fa-cog"></i> Settings</button>
+    </nav>
+
+    <!-- ─── CHAT TAB ─────────────────────────────── -->
+    <div class="tab-panel active" id="tab-chat">
+      <div class="panel-toolbar">
+        <div class="toolbar-left">
+          <button class="tb-btn" id="clearChatBtn"><i class="fas fa-trash"></i> Clear</button>
+          <label class="toggle-label">
+            <input type="checkbox" id="autoscrollChat" checked>
+            <span>Auto-scroll</span>
+          </label>
+          <label class="toggle-label">
+            <i class="fas fa-list-ol" style="color:var(--accent2)"></i>
+            <span>Tampilkan:</span>
+            <select id="chatLimitSelect" class="tb-input sm">
+              <option value="10">10 chat</option>
+              <option value="20">20 chat</option>
+              <option value="30" selected>30 chat</option>
+              <option value="50">50 chat</option>
+              <option value="100">100 chat</option>
+              <option value="0">Semua</option>
+            </select>
+          </label>
+        </div>
+        <div class="toolbar-right">
+          <input type="text" id="chatFilter" class="tb-input" placeholder="Filter chat...">
+        </div>
+      </div>
+      <div class="chat-log" id="chatLog" role="log" aria-live="polite"></div>
+    </div>
+
+
+    <!-- ─── GIFTS TAB ────────────────────────────── -->
+    <div class="tab-panel" id="tab-gifts">
+      <div class="panel-toolbar">
+        <div class="toolbar-left">
+          <button class="tb-btn" id="clearGiftBtn"><i class="fas fa-trash"></i> Clear</button>
+        </div>
+      </div>
+      <div class="gift-log" id="giftLog"></div>
+    </div>
+
+    <!-- ─── SONG QUEUE TAB ───────────────────────── -->
+    <div class="tab-panel" id="tab-songs">
+      <div class="song-layout">
+        <div class="now-playing-section">
+          <h3 class="section-title"><i class="fas fa-play-circle"></i> Now Playing</h3>
+          <div class="now-playing-card" id="nowPlayingCard">
+            <div class="np-idle"><i class="fas fa-music"></i><span>Tidak ada lagu</span></div>
+          </div>
+          <div class="np-controls">
+            <button class="btn btn-primary" id="skipSongBtn"><i class="fas fa-forward"></i> Skip / Next</button>
+            <button class="btn btn-danger" id="clearQueueBtn"><i class="fas fa-trash"></i> Clear Queue</button>
+          </div>
+        </div>
+        <div class="queue-section">
+          <h3 class="section-title"><i class="fas fa-list"></i> Antrian <span class="badge" id="queueCount">0</span></h3>
+          <div class="song-queue-list" id="songQueueList">
+            <div class="empty-state"><i class="fas fa-music"></i><span>Antrian kosong<br><small>Penonton bisa request dengan !sr [lagu]</small></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── LEADERBOARD TAB ──────────────────────── -->
+    <div class="tab-panel" id="tab-leaderboard">
+      <div class="leaderboard-header">
+        <h3 class="section-title"><i class="fas fa-crown"></i> Top Gift Senders</h3>
+        <div class="gift-goal-editor">
+          <label>Gift Goal:</label>
+          <input type="text" id="goalLabel" class="tb-input sm" placeholder="Label" value="Gift Goal">
+          <input type="number" id="goalTarget" class="tb-input sm" placeholder="Target diamonds" min="1" value="1000">
+          <button class="btn btn-primary sm" id="saveGoalBtn"><i class="fas fa-save"></i> Save</button>
+        </div>
+      </div>
+      <div class="leaderboard-list" id="leaderboardList">
+        <div class="empty-state"><i class="fas fa-gem"></i><span>Belum ada gift</span></div>
+      </div>
+    </div>
+
+    <!-- ─── BOT COMMANDS TAB ─────────────────────── -->
+    <div class="tab-panel" id="tab-commands">
+      <div class="commands-layout">
+        <div class="commands-left">
+          <h3 class="section-title"><i class="fas fa-robot"></i> Built-in Commands</h3>
+          <div class="builtin-commands">
+            <div class="cmd-row"><code>!sr [lagu]</code><span>Request lagu ke antrian</span></div>
+            <div class="cmd-row"><code>!lagu [lagu]</code><span>Alias untuk !sr</span></div>
+            <div class="cmd-row"><code>!req [lagu]</code><span>Alias untuk !sr</span></div>
+            <div class="cmd-row"><code>!q</code><span>Lihat antrian lagu</span></div>
+            <div class="cmd-row"><code>!np</code><span>Lagu yang sedang diputar</span></div>
+            <div class="cmd-row"><code>!skip</code><span>Skip lagu (mod only)</span></div>
+            <div class="cmd-row"><code>!help</code><span>Tampilkan bantuan commands</span></div>
+          </div>
+
+          <h3 class="section-title mt-2"><i class="fas fa-plus-circle"></i> Tambah Custom Command</h3>
+          <div class="add-command-form">
+            <input type="text" id="cmdTrigger" class="tb-input" placeholder="!perintah">
+            <textarea id="cmdResponse" class="tb-textarea" placeholder="Respons bot... Gunakan {user} untuk nama penonton" rows="3"></textarea>
+            <button class="btn btn-primary" id="addCommandBtn"><i class="fas fa-plus"></i> Tambah Command</button>
+          </div>
+        </div>
+        <div class="commands-right">
+          <h3 class="section-title"><i class="fas fa-list"></i> Custom Commands</h3>
+          <div class="custom-commands-list" id="customCommandsList">
+            <div class="empty-state"><i class="fas fa-terminal"></i><span>Belum ada custom command</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bot-replies-section">
+        <h3 class="section-title"><i class="fas fa-comment-dots"></i> Bot Replies Log</h3>
+        <div class="bot-replies-log" id="botRepliesLog"></div>
+      </div>
+    </div>
+
+    <!-- ─── SETTINGS TAB ─────────────────────────── -->
+    <div class="tab-panel" id="tab-settings">
+      <div class="settings-grid">
+
+        <!-- TTS Settings -->
+        <div class="settings-card">
+          <h3 class="settings-card-title"><i class="fas fa-volume-up"></i> Text-to-Speech (TTS)</h3>
+          <div class="settings-rows">
+            <label class="settings-row">
+              <span>TTS Chat</span>
+              <label class="switch"><input type="checkbox" id="ttsChatToggle" checked><span class="slider"></span></label>
+            </label>
+            <label class="settings-row">
+              <span>TTS Gift</span>
+              <label class="switch"><input type="checkbox" id="ttsGiftToggle" checked><span class="slider"></span></label>
+            </label>
+            <label class="settings-row">
+              <span>TTS Join / Welcome</span>
+              <label class="switch"><input type="checkbox" id="ttsJoinToggle" checked><span class="slider"></span></label>
+            </label>
+            <label class="settings-row">
+              <span>TTS Follow</span>
+              <label class="switch"><input type="checkbox" id="ttsFollowToggle" checked><span class="slider"></span></label>
+            </label>
+            <label class="settings-row">
+              <span>Suara (Voice)</span>
+              <select id="ttsVoiceSelect" class="tb-input sm"></select>
+            </label>
+            <label class="settings-row">
+              <span>Kecepatan <span id="ttsRateVal">1.0</span>x</span>
+              <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1" class="range-input">
+            </label>
+            <label class="settings-row">
+              <span>Pitch <span id="ttsPitchVal">1.0</span></span>
+              <input type="range" id="ttsPitch" min="0.5" max="2" step="0.1" value="1" class="range-input">
+            </label>
+            <label class="settings-row">
+              <span>Volume <span id="ttsVolVal">100</span>%</span>
+              <input type="range" id="ttsVolume" min="0" max="1" step="0.1" value="1" class="range-input">
+            </label>
+            <button class="btn btn-primary" id="testTtsBtn"><i class="fas fa-play"></i> Test TTS</button>
+          </div>
+        </div>
+
+        <!-- Overlay Theme -->
+        <div class="settings-card">
+          <h3 class="settings-card-title"><i class="fas fa-palette"></i> Overlay Theme</h3>
+          <div class="theme-grid" id="themeGrid">
+            <div class="theme-item active" data-theme="dark">
+              <div class="theme-preview dark-theme-prev"></div>
+              <span>Dark</span>
+            </div>
+            <div class="theme-item" data-theme="light">
+              <div class="theme-preview light-theme-prev"></div>
+              <span>Light</span>
+            </div>
+            <div class="theme-item" data-theme="neon">
+              <div class="theme-preview neon-theme-prev"></div>
+              <span>Neon</span>
+            </div>
+            <div class="theme-item" data-theme="glass">
+              <div class="theme-preview glass-theme-prev"></div>
+              <span>Glass</span>
+            </div>
+            <div class="theme-item" data-theme="minimal">
+              <div class="theme-preview minimal-theme-prev"></div>
+              <span>Minimal</span>
+            </div>
+            <div class="theme-item" data-theme="pink">
+              <div class="theme-preview pink-theme-prev"></div>
+              <span>Pink</span>
+            </div>
+          </div>
+          <div class="settings-rows mt-2">
+            <label class="settings-row">
+              <span>Welcome message aktif</span>
+              <label class="switch"><input type="checkbox" id="welcomeToggle" checked><span class="slider"></span></label>
+            </label>
+            <label class="settings-row">
+              <span>Max chat di overlay</span>
+              <input type="number" id="chatMaxOverlay" class="tb-input sm" value="30" min="5" max="100">
+            </label>
+            <label class="settings-row">
+              <span>SociaBuzz Username/URL</span>
+              <input type="text" id="sociaBuzzInput" class="tb-input" placeholder="contoh: budi_gaming">
+            </label>
+            <label class="settings-row">
+              <span>TikTok Session ID <small>(Anti-Block)</small></span>
+              <input type="text" id="sessionIdInput" class="tb-input" placeholder="Paste sessionid cookie...">
+            </label>
+            <label class="settings-row">
+              <span>Proxy URL <small>(Bypass IP Block)</small></span>
+              <input type="text" id="proxyInput" class="tb-input" placeholder="http://user:pass@host:port">
+            </label>
+          </div>
+          <button class="btn btn-primary mt-2" id="saveSettingsBtn"><i class="fas fa-save"></i> Simpan Settings</button>
+        </div>
+
+        <!-- Gift Goal -->
+        <div class="settings-card">
+          <h3 class="settings-card-title"><i class="fas fa-bullseye"></i> Gift Goal Target</h3>
+          <div class="settings-rows">
+            <label class="settings-row">
+              <span>Target Diamond</span>
+              <input type="number" id="goalTarget" class="tb-input sm" value="1000" min="10">
+            </label>
+            <label class="settings-row">
+              <span>Label Goal</span>
+              <input type="text" id="goalLabel" class="tb-input" value="Goal Diamond">
+            </label>
+            <button class="btn btn-primary mt-2" id="saveGoalBtn" style="width:100%"><i class="fas fa-save"></i> Simpan Goal</button>
+          </div>
+        </div>
+
+        <!-- Bot Reply Preview -->
+        <div class="settings-card">
+          <h3 class="settings-card-title"><i class="fas fa-info-circle"></i> Overlay URLs</h3>
+          <div class="settings-rows">
+            <div class="url-row">
+              <label>Chat Overlay</label>
+              <div class="url-display" id="urlChat"></div>
+            </div>
+            <div class="url-row">
+              <label>Gift Alert Overlay</label>
+              <div class="url-display" id="urlGift"></div>
+            </div>
+            <div class="url-row">
+              <label>Leaderboard Overlay</label>
+              <div class="url-display" id="urlLeaderboard"></div>
+            </div>
+            <div class="url-row">
+              <label>Now Playing Overlay</label>
+              <div class="url-display" id="urlSong"></div>
+            </div>
+            <div class="url-row">
+              <label>Donation QR Overlay</label>
+              <div class="url-display" id="urlQr"></div>
+            </div>
+            <div class="url-row">
+              <label>Gift Goal Overlay</label>
+              <div class="url-display" id="urlGoal"></div>
+            </div>
+          </div>
+          <p class="settings-note">Paste URL di atas ke <strong>OBS > Browser Source</strong> untuk menampilkan overlay di stream.</p>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  TOAST NOTIFICATIONS                           -->
+  <!-- ══════════════════════════════════════════════ -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

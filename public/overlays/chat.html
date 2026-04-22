@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chat Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:transparent;overflow:hidden;height:100vh;display:flex;flex-direction:column;justify-content:flex-end;padding:12px}
+/* THEMES */
+body.dark .chat-item{background:rgba(13,14,20,.85);border-color:rgba(255,255,255,.08);color:#fff}
+body.dark .chat-username{color:#25f4ee}
+body.light .chat-item{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.08);color:#111}
+body.light .chat-username{color:#fe2c55}
+body.neon .chat-item{background:rgba(0,15,8,.85);border:1px solid #00ff88;color:#00ff88}
+body.neon .chat-username{color:#fff;text-shadow:0 0 8px #00ff88}
+body.glass .chat-item{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(12px);color:#fff}
+body.glass .chat-username{color:#25f4ee}
+body.minimal .chat-item{background:rgba(0,0,0,.7);border-left:3px solid #fff;border-radius:4px;color:#fff}
+body.minimal .chat-username{color:#25f4ee}
+body.pink .chat-item{background:rgba(60,0,35,.85);border-color:rgba(255,100,150,.2);color:#ffcce0}
+body.pink .chat-username{color:#ff6496}
+
+.chat-list{display:flex;flex-direction:column;gap:6px;max-height:100vh;overflow:hidden}
+.chat-item{display:flex;align-items:flex-start;gap:9px;padding:9px 13px;border-radius:10px;border:1px solid transparent;animation:slideUp .25s ease;word-break:break-word;backdrop-filter:blur(8px)}
+.chat-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;object-fit:cover;border:2px solid rgba(255,255,255,.2)}
+.chat-avatar-fallback{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);font-size:13px;font-weight:700;flex-shrink:0}
+.chat-body{flex:1}
+.chat-header{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.chat-username{font-weight:700;font-size:13px}
+.chat-verified{font-size:11px;color:#25f4ee}
+.chat-badge{font-size:10px;padding:1px 5px;border-radius:4px;font-weight:700}
+.badge-mod{background:rgba(34,197,94,.3);color:#22c55e}
+.badge-sub{background:rgba(168,85,247,.3);color:#c084fc}
+.badge-gifter{background:rgba(255,215,0,.3);color:#ffd700}
+.chat-msg{font-size:14px;line-height:1.4}
+.event-join{background:rgba(34,197,94,.15)!important;border-color:rgba(34,197,94,.3)!important}
+.event-follow{background:rgba(254,44,85,.1)!important;border-color:rgba(254,44,85,.3)!important}
+.event-icon{margin-right:5px}
+
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fade-out{animation:fadeOut .4s ease forwards}
+@keyframes fadeOut{to{opacity:0;transform:translateY(-8px)}}
+</style>
+</head>
+<body class="dark" id="overlayBody">
+<div class="chat-list" id="chatList"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let MAX    = 15;
+let cfg    = {
+  theme:'dark', fontSize:14, animation:'slideUp', position:'bottom',
+  showChat:true, showJoin:true, showFollow:true, showAvatar:true, showBadge:true
+};
+
+socket.on('init', d => {
+  if(d.settings) applySettings(d.settings);
+  (d.chatLog||[]).slice(-MAX).forEach(e => addItem(e));
+});
+socket.on('settings', s => applySettings(s));
+socket.on('chatEvent', e => addItem(e));
+
+function applySettings(s){
+  if(s.overlayTheme)  { cfg.theme     = s.overlayTheme;  document.getElementById('overlayBody').className = s.overlayTheme; }
+  if(s.chatMax)       { MAX = s.chatMax; }
+  if(s.chatFontSize)  { cfg.fontSize   = s.chatFontSize;  document.documentElement.style.setProperty('--chat-fs', s.chatFontSize+'px'); }
+  if(s.chatAnimation) { cfg.animation  = s.chatAnimation; }
+  if(s.chatPosition)  { cfg.position   = s.chatPosition;
+    const list = document.getElementById('chatList');
+    list.style.flexDirection = s.chatPosition === 'top' ? 'column' : 'column-reverse';
+  }
+  if(s.chatShow)      { cfg.showChat = s.chatShow.chat !== false; cfg.showJoin = s.chatShow.join !== false; cfg.showFollow = s.chatShow.follow !== false; }
+  if(s.chatShowAvatar !== undefined) cfg.showAvatar = s.chatShowAvatar;
+  if(s.chatShowBadge  !== undefined) cfg.showBadge  = s.chatShowBadge;
+}
+
+function addItem(ev){
+  // Filter by event type
+  if(ev.type === 'chat'   && !cfg.showChat)   return;
+  if(ev.type === 'join'   && !cfg.showJoin)   return;
+  if(ev.type === 'follow' && !cfg.showFollow) return;
+
+  const list = document.getElementById('chatList');
+  const el   = document.createElement('div');
+  el.className = 'chat-item' + (ev.type==='join'?' event-join':ev.type==='follow'?' event-follow':'');
+  el.style.animation = getAnim(cfg.animation);
+
+  const user = ev.nickname || ev.user || '?';
+  const verified = ev.verified ? '<span class="chat-verified">✓</span>' : '';
+  const badges = cfg.showBadge ? (ev.badges||[]).map(b=>`<span class="chat-badge badge-${b}">${b}</span>`).join('') : '';
+
+  let avatarHtml = '';
+  if(cfg.showAvatar){
+    avatarHtml = ev.avatar
+      ? `<img class="chat-avatar" src="${ev.avatar}" onerror="this.outerHTML='<div class=chat-avatar-fallback>${esc(user[0]||'?').toUpperCase()}</div>'">`
+      : `<div class="chat-avatar-fallback">${esc(user[0]||'?').toUpperCase()}</div>`;
+  }
+
+  let body = '';
+  if(ev.type==='chat'){
+    body = `<div class="chat-header"><span class="chat-username">${esc(user)}</span>${verified}${badges}</div><div class="chat-msg" style="font-size:var(--chat-fs,14px)">${esc(ev.msg||'')}</div>`;
+  } else if(ev.type==='join'){
+    body = `<div class="chat-header"><span class="chat-username">${esc(user)}</span>${verified}</div><div class="chat-msg"><span class="event-icon">👋</span>Bergabung!</div>`;
+  } else if(ev.type==='follow'){
+    body = `<div class="chat-header"><span class="chat-username">${esc(user)}</span></div><div class="chat-msg"><span class="event-icon">❤️</span>Follow!</div>`;
+  }
+  el.innerHTML = avatarHtml + `<div class="chat-body">${body}</div>`;
+  list.appendChild(el);
+
+  const activeItems = Array.from(list.children).filter(el => !el.classList.contains('removing'));
+  const toRemove = activeItems.length - MAX;
+  for(let i=0; i<toRemove; i++){
+    const old = activeItems[i];
+    old.classList.add('removing');
+    old.style.animation = 'fadeOut .4s ease forwards';
+    setTimeout(()=>old.remove(), 400);
+  }
+}
+
+function getAnim(type){
+  const anims = { slideUp:'slideUp .25s ease', fadeIn:'fadeIn .3s ease', popIn:'popIn .3s cubic-bezier(.34,1.56,.64,1)', slideLeft:'slideLeft .25s ease' };
+  return anims[type] || anims.slideUp;
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+
+</body>
+</html>

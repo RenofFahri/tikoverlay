@@ -1,0 +1,15 @@
+{
+  "name": "tiktok-live-bot-v2",
+  "version": "2.0.0",
+  "description": "TikTok Live Bot v2 - Full Dashboard, Overlays, TTS, Gift Goals, Song Request",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.4",
+    "tiktok-live-connector": "^2.1.1-beta1"
+  }
+}

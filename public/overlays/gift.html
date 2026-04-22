@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Gift Alert Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:transparent;overflow:hidden;display:flex;align-items:center;justify-content:center;height:100vh}
+.alert-wrap{position:relative;width:100%}
+.gift-alert{display:flex;align-items:center;gap:16px;padding:16px 22px;border-radius:16px;background:rgba(13,14,20,.9);border:1px solid rgba(37,244,238,.3);backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,.6),0 0 0 1px rgba(37,244,238,.15);max-width:440px;margin:0 auto;transform:scale(0);opacity:0;transition:none}
+.gift-alert.show{animation:popIn .4s cubic-bezier(.34,1.56,.64,1) forwards}
+.gift-alert.hide{animation:popOut .3s ease forwards}
+
+.gift-img{width:60px;height:60px;border-radius:12px;object-fit:cover;background:rgba(37,244,238,.1);display:flex;align-items:center;justify-content:center;font-size:32px;border:2px solid rgba(37,244,238,.3);flex-shrink:0}
+.gift-img img{width:100%;height:100%;border-radius:10px;object-fit:cover}
+.gift-info{flex:1}
+.gift-sender{font-size:12px;color:#a0a8c0;margin-bottom:4px}
+.gift-name{font-size:18px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:6px}
+.gift-count{font-size:13px;color:#25f4ee;font-weight:700;display:flex;align-items:center;gap:6px}
+.diamonds{display:flex;align-items:center;gap:4px;color:#ffd700;font-size:13px;font-weight:700;margin-top:3px}
+.particles{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;border-radius:16px}
+.particle{position:absolute;font-size:16px;animation:floatUp 1.2s ease forwards}
+
+/* THEMES */
+body.dark   .gift-alert{background:rgba(13,14,20,.92);border-color:rgba(37,244,238,.3)}
+body.light  .gift-alert{background:rgba(255,255,255,.94);border-color:rgba(254,44,85,.3);color:#111}
+body.light  .gift-name{color:#111}
+body.light  .gift-sender{color:#666}
+body.neon   .gift-alert{background:rgba(0,10,5,.9);border-color:#00ff88;box-shadow:0 0 30px rgba(0,255,136,.3)}
+body.neon   .gift-name{color:#00ff88;text-shadow:0 0 10px #00ff88}
+body.glass  .gift-alert{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);backdrop-filter:blur(20px)}
+body.pink   .gift-alert{background:rgba(40,0,20,.9);border-color:rgba(255,100,150,.4)}
+body.pink   .gift-name{color:#ff88b0}
+
+@keyframes popIn{0%{transform:scale(0) translateY(20px);opacity:0}70%{transform:scale(1.06) translateY(-4px);opacity:1}100%{transform:scale(1) translateY(0);opacity:1}}
+@keyframes popOut{from{transform:scale(1);opacity:1}to{transform:scale(.8) translateY(10px);opacity:0}}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(-80px) rotate(30deg)}}
+</style>
+</head>
+<body class="dark" id="overlayBody">
+<div class="alert-wrap">
+  <div class="gift-alert" id="giftAlert">
+    <div class="gift-img" id="giftImg">🎁</div>
+    <div class="gift-info">
+      <div class="gift-sender" id="giftSender">dari @username</div>
+      <div class="gift-name"  id="giftName">Gift</div>
+      <div class="gift-count"><span>×</span><span id="giftCount">1</span></div>
+      <div class="diamonds">💎 <span id="giftDiamonds">0</span></div>
+    </div>
+    <div class="particles" id="particles"></div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let queue    = [];
+let showing  = false;
+
+socket.on('init',     d => { if(d.settings?.overlayTheme) setTheme(d.settings.overlayTheme); });
+socket.on('settings', s => { if(s.overlayTheme) setTheme(s.overlayTheme); });
+socket.on('giftAlert', ev => { queue.push(ev); processQueue(); });
+
+function setTheme(t){ document.getElementById('overlayBody').className = t; }
+
+function processQueue(){
+  if(showing || !queue.length) return;
+  showing = true;
+  const ev = queue.shift();
+  showAlert(ev, ()=>{ showing=false; setTimeout(processQueue, 400); });
+}
+
+function showAlert(ev, done){
+  const alert = document.getElementById('giftAlert');
+  document.getElementById('giftSender').textContent   = `dari @${ev.nickname||ev.user}`;
+  document.getElementById('giftName').textContent     = ev.gift || 'Gift';
+  document.getElementById('giftCount').textContent    = ev.count || 1;
+  document.getElementById('giftDiamonds').textContent = ev.diamonds || 0;
+
+  const imgEl = document.getElementById('giftImg');
+  if(ev.giftImg){ imgEl.innerHTML = `<img src="${ev.giftImg}" onerror="this.outerHTML='🎁'">`; }
+  else { imgEl.textContent = '🎁'; }
+
+  spawnParticles();
+  alert.className = 'gift-alert show';
+
+  setTimeout(()=>{
+    alert.className = 'gift-alert hide';
+    setTimeout(done, 350);
+  }, 3500);
+}
+
+function spawnParticles(){
+  const p = document.getElementById('particles');
+  p.innerHTML = '';
+  const emojis = ['🎁','💎','✨','🌟','⭐','💫','🎊','🎉'];
+  for(let i=0;i<8;i++){
+    const el = document.createElement('div');
+    el.className = 'particle';
+    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    el.style.left  = Math.random()*100+'%';
+    el.style.top   = (50+Math.random()*50)+'%';
+    el.style.animationDelay = Math.random()*0.5+'s';
+    p.appendChild(el);
+  }
+}
+</script>
+</body>
+</html>

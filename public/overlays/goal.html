@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Gift Goal Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:transparent;overflow:hidden;height:100vh;display:flex;align-items:flex-start;justify-content:flex-start;padding:20px}
+
+.goal-widget {
+  background: rgba(13, 14, 20, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px 20px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 350px;
+  max-width: 500px;
+  transition: transform 0.4s ease, opacity 0.4s ease;
+}
+
+.goal-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(37, 244, 238, 0.15);
+  color: #25f4ee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.goal-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goal-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.goal-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #a0a8c0;
+}
+
+.goal-stats {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+.goal-stats .sep {
+  color: #6b7394;
+  margin: 0 4px;
+  font-weight: 400;
+}
+.goal-stats .target {
+  color: #a0a8c0;
+  font-size: 12px;
+}
+
+.goal-bar-wrap {
+  width: 100%;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.goal-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #25f4ee, #fe2c55);
+  border-radius: 99px;
+  width: 0%;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  box-shadow: 0 0 10px rgba(37,244,238,0.5);
+}
+
+.goal-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 2s infinite linear;
+}
+
+/* THEMES */
+body.light .goal-widget { background:rgba(255,255,255,0.92); border-color:rgba(0,0,0,0.08); color:#111; }
+body.light .goal-label { color:#666; }
+body.light .goal-stats { color:#111; }
+body.light .goal-stats .target { color:#666; }
+body.light .goal-bar-wrap { background:rgba(0,0,0,0.1); }
+
+body.neon .goal-widget { background:rgba(0,15,8,0.85); border-color:#00ff88; color:#00ff88; box-shadow: 0 0 20px rgba(0,255,136,0.2); }
+body.neon .goal-label { color:#00cc6a; }
+body.neon .goal-stats { color:#fff; }
+body.neon .goal-icon { color:#00ff88; background:rgba(0,255,136,0.1); }
+body.neon .goal-bar { background: linear-gradient(90deg, #00ff88, #00cc6a); box-shadow: 0 0 10px #00ff88; }
+
+body.glass .goal-widget { background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.2); backdrop-filter:blur(15px); }
+body.pink .goal-widget { background:rgba(60,0,35,0.85); border-color:rgba(255,100,150,0.2); color:#ffcce0; }
+body.pink .goal-bar { background: linear-gradient(90deg, #ff6496, #ff0050); box-shadow: 0 0 10px rgba(255,100,150,0.5); }
+body.pink .goal-icon { color:#ff6496; background:rgba(255,100,150,0.15); }
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+</style>
+</head>
+<body class="dark" id="overlayBody">
+
+<div class="goal-widget" id="goalWidget">
+  <div class="goal-icon"><i class="fas fa-gem"></i></div>
+  <div class="goal-info">
+    <div class="goal-header">
+      <div class="goal-label" id="goalLabel">Gift Goal</div>
+      <div class="goal-stats">
+        <span id="goalCurrent">0</span>
+        <span class="sep">/</span>
+        <span class="target" id="goalTarget">1K</span>
+      </div>
+    </div>
+    <div class="goal-bar-wrap">
+      <div class="goal-bar" id="goalBar"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+
+function fmtNum(n) { return n >= 1000 ? (n/1000).toFixed(1)+'K' : n; }
+
+socket.on('init', d => {
+  if(d.settings?.overlayTheme) document.getElementById('overlayBody').className = d.settings.overlayTheme;
+  if(d.giftGoal) updateGoal(d.giftGoal);
+});
+
+socket.on('settings', s => {
+  if(s.overlayTheme) document.getElementById('overlayBody').className = s.overlayTheme;
+});
+
+socket.on('giftGoal', g => {
+  updateGoal(g);
+});
+
+function updateGoal(g) {
+  if (!g) return;
+  document.getElementById('goalLabel').textContent = g.label || 'Gift Goal';
+  document.getElementById('goalCurrent').textContent = fmtNum(g.current || 0);
+  document.getElementById('goalTarget').textContent = fmtNum(g.target || 1000);
+  
+  const pct = Math.min(100, Math.round(((g.current || 0) / (g.target || 1)) * 100));
+  document.getElementById('goalBar').style.width = pct + '%';
+}
+</script>
+</body>
+</html>

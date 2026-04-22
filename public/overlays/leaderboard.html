@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Gift Leaderboard Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:transparent;padding:12px;min-height:100vh}
+.lb-container{max-width:320px}
+.lb-title{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 14px;border-radius:10px;font-weight:800;font-size:14px}
+.lb-list{display:flex;flex-direction:column;gap:6px}
+.lb-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;animation:slideIn .3s ease}
+
+/* DARK (default) */
+body.dark .lb-title{background:rgba(13,14,20,.85);color:#25f4ee;border:1px solid rgba(37,244,238,.2)}
+body.dark .lb-item{background:rgba(13,14,20,.85);border:1px solid rgba(255,255,255,.07);color:#fff}
+body.dark .lb-name{color:#fff}
+body.dark .lb-diamonds{color:#25f4ee}
+
+/* LIGHT */
+body.light .lb-title{background:rgba(255,255,255,.92);color:#fe2c55;border:1px solid rgba(254,44,85,.2)}
+body.light .lb-item{background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.08);color:#111}
+body.light .lb-diamonds{color:#fe2c55}
+
+/* NEON */
+body.neon .lb-title{background:rgba(0,10,5,.9);color:#00ff88;border:1px solid #00ff88;text-shadow:0 0 8px #00ff88}
+body.neon .lb-item{background:rgba(0,10,5,.85);border:1px solid rgba(0,255,136,.3);color:#00ff88}
+body.neon .lb-rank{text-shadow:0 0 6px currentColor}
+
+/* GLASS */
+body.glass .lb-title{background:rgba(255,255,255,.15);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.25);color:#fff}
+body.glass .lb-item{background:rgba(255,255,255,.1);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);color:#fff}
+
+/* PINK */
+body.pink .lb-title{background:rgba(40,0,20,.9);border:1px solid rgba(255,100,150,.3);color:#ff88b0}
+body.pink .lb-item{background:rgba(40,0,20,.85);border:1px solid rgba(255,100,150,.2);color:#ffcce0}
+body.pink .lb-diamonds{color:#ff88b0}
+
+.lb-rank{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0}
+.rank-gold{background:#ffd700;color:#000}
+.rank-silver{background:#c0c0c0;color:#000}
+.rank-bronze{background:#cd7f32;color:#fff}
+.rank-other{background:rgba(255,255,255,.15);color:inherit}
+.lb-name{flex:1;font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-diamonds{display:flex;align-items:center;gap:4px;font-weight:700;font-size:13px}
+
+@keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+</style>
+</head>
+<body class="dark" id="overlayBody">
+<div class="lb-container">
+  <div class="lb-title">👑 Top Gift Senders</div>
+  <div class="lb-list" id="lbList">
+    <div style="color:rgba(255,255,255,.4);font-size:12px;padding:10px">Belum ada gift...</div>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+socket.on('init',        d => { if(d.settings?.overlayTheme) setTheme(d.settings.overlayTheme); render(d.leaderboard||[]); });
+socket.on('settings',    s => { if(s.overlayTheme) setTheme(s.overlayTheme); });
+socket.on('leaderboard', d => render(d));
+
+function setTheme(t){ document.getElementById('overlayBody').className = t; }
+
+function render(list){
+  const el = document.getElementById('lbList');
+  if(!list||!list.length){ el.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:12px;padding:10px">Belum ada gift...</div>'; return; }
+  const rankClass = [,'rank-gold','rank-silver','rank-bronze'];
+  el.innerHTML = list.slice(0,10).map(u=>`
+    <div class="lb-item">
+      <div class="lb-rank ${rankClass[u.rank]||'rank-other'}">${u.rank}</div>
+      <div class="lb-name">@${esc(u.username)}</div>
+      <div class="lb-diamonds">💎 ${u.diamonds.toLocaleString()}</div>
+    </div>`).join('');
+}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
