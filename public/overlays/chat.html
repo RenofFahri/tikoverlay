@@ -35,8 +35,12 @@ body.pink .chat-username{color:#ff6496}
 .badge-sub{background:rgba(168,85,247,.3);color:#c084fc}
 .badge-gifter{background:rgba(255,215,0,.3);color:#ffd700}
 .chat-msg{font-size:14px;line-height:1.4}
-.event-join{background:rgba(34,197,94,.15)!important;border-color:rgba(34,197,94,.3)!important}
-.event-follow{background:rgba(254,44,85,.1)!important;border-color:rgba(254,44,85,.3)!important}
+.event-join{border-left:4px solid #00ff88!important; background: rgba(0, 0, 0, 0.4)!important;}
+.event-follow{border-left:4px solid #fe2c55!important; background: rgba(0, 0, 0, 0.4)!important;}
+body.light .event-join, body.light .event-follow { background: rgba(255, 255, 255, 0.6)!important; }
+body.neon .event-join { border-color: #00ff88!important; }
+body.pink .event-join { border-color: #ff6496!important; }
+
 .event-icon{margin-right:5px}
 
 @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
@@ -48,74 +52,96 @@ body.pink .chat-username{color:#ff6496}
 <div class="chat-list" id="chatList"></div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
-let MAX    = 15;
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000
+});
+
+let MAX    = 30;
+let queue  = [];
+let isProcessing = false;
 let cfg    = {
   theme:'dark', fontSize:14, animation:'slideUp', position:'bottom',
   showChat:true, showJoin:true, showFollow:true, showAvatar:true, showBadge:true
 };
 
+socket.on('connect', () => console.log('✅ Overlay Connected'));
 socket.on('init', d => {
   if(d.settings) applySettings(d.settings);
-  (d.chatLog||[]).slice(-MAX).forEach(e => addItem(e));
+  const list = document.getElementById('chatList');
+  list.innerHTML = '';
+  (d.chatLog||[]).slice(-MAX).forEach(e => addItem(e, true)); // true = instant for old logs
 });
 socket.on('settings', s => applySettings(s));
-socket.on('chatEvent', e => addItem(e));
+socket.on('chatEvent', data => {
+  // Debug log (bisa dihapus nanti)
+  console.log('Incoming event:', data.type, 'Show join?', cfg.chatShow?.join);
+
+  // VALIDASI FILTER: Jika join dimatikan, jangan masukkan ke antrian
+  if (data.type === 'member' || data.type === 'join') {
+     if (cfg.chatShow && cfg.chatShow.join === false) return;
+  }
+  
+  if (data.type === 'follow' && cfg.chatShow?.follow === false) return;
+  if (data.type === 'chat' && cfg.chatShow?.chat === false) return;
+  
+  queue.push(data);
+  processQueue();
+});
 
 function applySettings(s){
-  if(s.overlayTheme)  { cfg.theme     = s.overlayTheme;  document.getElementById('overlayBody').className = s.overlayTheme; }
-  if(s.chatMax)       { MAX = s.chatMax; }
-  if(s.chatFontSize)  { cfg.fontSize   = s.chatFontSize;  document.documentElement.style.setProperty('--chat-fs', s.chatFontSize+'px'); }
-  if(s.chatAnimation) { cfg.animation  = s.chatAnimation; }
-  if(s.chatPosition)  { cfg.position   = s.chatPosition;
-    const list = document.getElementById('chatList');
-    list.style.flexDirection = s.chatPosition === 'top' ? 'column' : 'column-reverse';
+  if(s.overlayTheme)  { cfg.theme = s.overlayTheme;  document.getElementById('overlayBody').className = s.overlayTheme; }
+  if(s.chatShow)      { cfg.chatShow = s.chatShow; }
+  if(s.chatMax)       { MAX = parseInt(s.chatMax) || 30; }
+  if(s.chatFontSize)  { cfg.fontSize = s.chatFontSize; document.documentElement.style.setProperty('--chat-fs', s.chatFontSize+'px'); }
+  if(s.chatPosition)  { 
+    document.getElementById('chatList').style.flexDirection = 'column';
   }
-  if(s.chatShow)      { cfg.showChat = s.chatShow.chat !== false; cfg.showJoin = s.chatShow.join !== false; cfg.showFollow = s.chatShow.follow !== false; }
-  if(s.chatShowAvatar !== undefined) cfg.showAvatar = s.chatShowAvatar;
-  if(s.chatShowBadge  !== undefined) cfg.showBadge  = s.chatShowBadge;
 }
 
-function addItem(ev){
-  // Filter by event type
-  if(ev.type === 'chat'   && !cfg.showChat)   return;
-  if(ev.type === 'join'   && !cfg.showJoin)   return;
-  if(ev.type === 'follow' && !cfg.showFollow) return;
+function processQueue() {
+  if (isProcessing || queue.length === 0) return;
+  isProcessing = true;
+  
+  const ev = queue.shift();
+  addItem(ev);
+  
+  // Jika antrian banyak, percepat jedanya. Jika sedikit, santai saja (500ms).
+  const delay = queue.length > 5 ? 100 : 500;
+  setTimeout(() => {
+    isProcessing = false;
+    processQueue();
+  }, delay);
+}
 
+function addItem(ev, instant = false){
+  if(ev.type === 'chat' && !cfg.showChat) return;
   const list = document.getElementById('chatList');
-  const el   = document.createElement('div');
-  el.className = 'chat-item' + (ev.type==='join'?' event-join':ev.type==='follow'?' event-follow':'');
-  el.style.animation = getAnim(cfg.animation);
-
+  const el = document.createElement('div');
+  el.className = 'chat-item' + (ev.type==='join'?' event-join':ev.type==='follow'?' event-follow':ev.type==='share'?' event-share':'');
+  
   const user = ev.nickname || ev.user || '?';
-  const verified = ev.verified ? '<span class="chat-verified">✓</span>' : '';
-  const badges = cfg.showBadge ? (ev.badges||[]).map(b=>`<span class="chat-badge badge-${b}">${b}</span>`).join('') : '';
-
-  let avatarHtml = '';
-  if(cfg.showAvatar){
-    avatarHtml = ev.avatar
-      ? `<img class="chat-avatar" src="${ev.avatar}" onerror="this.outerHTML='<div class=chat-avatar-fallback>${esc(user[0]||'?').toUpperCase()}</div>'">`
-      : `<div class="chat-avatar-fallback">${esc(user[0]||'?').toUpperCase()}</div>`;
-  }
-
+  const avatar = cfg.showAvatar ? (ev.avatar ? `<img class="chat-avatar" src="${ev.avatar}" onerror="this.style.display='none'">` : `<div class="chat-avatar-fallback">${user[0]}</div>`) : '';
+  
   let body = '';
-  if(ev.type==='chat'){
-    body = `<div class="chat-header"><span class="chat-username">${esc(user)}</span>${verified}${badges}</div><div class="chat-msg" style="font-size:var(--chat-fs,14px)">${esc(ev.msg||'')}</div>`;
-  } else if(ev.type==='join'){
-    body = `<div class="chat-header"><span class="chat-username">${esc(user)}</span>${verified}</div><div class="chat-msg"><span class="event-icon">👋</span>Bergabung!</div>`;
-  } else if(ev.type==='follow'){
-    body = `<div class="chat-header"><span class="chat-username">${esc(user)}</span></div><div class="chat-msg"><span class="event-icon">❤️</span>Follow!</div>`;
-  }
-  el.innerHTML = avatarHtml + `<div class="chat-body">${body}</div>`;
+  if(ev.type==='chat') body = `<div class="chat-header"><span class="chat-username">${esc(user)}</span></div><div class="chat-msg">${esc(ev.msg)}</div>`;
+  else if(ev.type==='join') body = `<div class="chat-msg">👋 ${esc(user)} bergabung</div>`;
+  else if(ev.type==='follow') body = `<div class="chat-msg">❤️ ${esc(user)} follow</div>`;
+  else if(ev.type==='share') body = `<div class="chat-msg">🔗 ${esc(user)} share</div>`;
+
+  el.innerHTML = avatar + `<div class="chat-body">${body}</div>`;
+  
+  // Masukkan di akhir (Bottom)
   list.appendChild(el);
 
-  const activeItems = Array.from(list.children).filter(el => !el.classList.contains('removing'));
-  const toRemove = activeItems.length - MAX;
-  for(let i=0; i<toRemove; i++){
-    const old = activeItems[i];
-    old.classList.add('removing');
-    old.style.animation = 'fadeOut .4s ease forwards';
-    setTimeout(()=>old.remove(), 400);
+  if(!instant) {
+    el.style.animation = 'slideUp 0.3s ease forwards';
+  }
+
+  // Limit items - hapus yang paling lama (First Child)
+  while(list.children.length > MAX) {
+    list.removeChild(list.firstChild);
   }
 }
 

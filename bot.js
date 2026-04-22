@@ -13,44 +13,44 @@ let currentUsername = '';
 
 // ── Built-in bot commands ────────────────────────────────────
 const BUILT_IN_COMMANDS = {
-  '!sr':    handleSongRequest,
-  '!lagu':  handleSongRequest,
-  '!req':   handleSongRequest,
-  '!q':     handleQueueCmd,
+  '!sr': handleSongRequest,
+  '!lagu': handleSongRequest,
+  '!req': handleSongRequest,
+  '!q': handleQueueCmd,
   '!queue': handleQueueCmd,
-  '!np':    handleNowPlayingCmd,
-  '!skip':  handleSkipCmd,
-  '!help':  handleHelpCmd,
-  '!bot':   handleHelpCmd,
+  '!np': handleNowPlayingCmd,
+  '!skip': handleSkipCmd,
+  '!help': handleHelpCmd,
+  '!bot': handleHelpCmd,
 };
 
 // ── Start bot ────────────────────────────────────────────────
 async function startBot(username) {
   if (connection) {
-    try { connection.disconnect(); } catch (_) {}
+    try { connection.disconnect(); } catch (_) { }
     connection = null;
   }
 
   currentUsername = username;
   const state = global._state;
-  const io    = global._io;
+  const io = global._io;
 
   // Reset per-session stats
-  state.viewers   = 0;
-  state.likes     = 0;
-  state.follows   = 0;
-  state.shares    = 0;
+  state.viewers = 0;
+  state.likes = 0;
+  state.follows = 0;
+  state.shares = 0;
   state.leaderboard = {};
   state.giftGoal.current = 0;
 
   const connectionOptions = {
-    processInitialData    : false,
+    processInitialData: false,
     enableExtendedGiftInfo: true,
     enableWebsocketUpgrade: true,
-    requestPollingIntervalMs: 2000,
+    requestPollingIntervalMs: 1000,
     clientParams: {
-      app_language    : 'id-ID',
-      device_platform : 'web',
+      app_language: 'id-ID',
+      device_platform: 'web',
     }
   };
 
@@ -69,8 +69,8 @@ async function startBot(username) {
   // ── CONNECTED ──────────────────────────────────────────────
   const liveState = await connection.connect();
   state.connected = true;
-  state.username  = username;
-  state.viewers   = liveState.viewerCount || 0;
+  state.username = username;
+  state.viewers = liveState.viewerCount || 0;
 
   io.emit('botStatus', { connected: true, username, viewers: state.viewers });
   io.emit('stats', { viewers: state.viewers, likes: state.likes, follows: state.follows, shares: state.shares });
@@ -79,33 +79,37 @@ async function startBot(username) {
 
   // ── CHAT ──────────────────────────────────────────────────
   connection.on('chat', (data) => {
-    const user     = data.uniqueId    || 'Unknown';
-    const nickname = data.nickname    || user;
-    const msg      = data.comment     || '';
+    const user = data.uniqueId || 'Unknown';
+    const nickname = data.nickname || user;
+    const msg = data.comment || '';
     const verified = data.isModerator || data.isSubscriber || false;
-    const avatar   = data.profilePictureUrl || '';
-    const badges   = [];
-    if (data.isModerator)  badges.push('mod');
+    const avatar = data.profilePictureUrl || '';
+    const badges = [];
+    if (data.isModerator) badges.push('mod');
     if (data.isSubscriber) badges.push('sub');
-    if (data.isNewGifter)  badges.push('gifter');
+    if (data.isNewGifter) badges.push('gifter');
 
     const event = { type: 'chat', user, nickname, msg, verified, avatar, badges, ts: Date.now() };
 
-    // Check bot commands
-    handleCommand(event);
+    try {
+      // Check bot commands
+      handleCommand(event);
+      pushChat(event);
+    } catch (e) {
+      console.error('Error handling chat event:', e);
+    }
 
-    pushChat(event);
     log(`💬 @${user}: ${msg}`);
   });
 
   // ── GIFT ──────────────────────────────────────────────────
   connection.on('gift', (data) => {
-    const user     = data.uniqueId   || 'Unknown';
-    const nickname = data.nickname   || user;
-    const gift     = data.giftName   || `Gift#${data.giftId}`;
-    const count    = data.repeatCount || 1;
+    const user = data.uniqueId || 'Unknown';
+    const nickname = data.nickname || user;
+    const gift = data.giftName || `Gift#${data.giftId}`;
+    const count = data.repeatCount || 1;
     const diamonds = (data.diamondCount || 0) * count;
-    const giftImg  = data.giftPictureUrl || '';
+    const giftImg = data.giftPictureUrl || '';
     const verified = data.isModerator || false;
 
     if (data.repeatEnd || !data.repeatCount) {
@@ -128,30 +132,38 @@ async function startBot(username) {
 
   // ── MEMBER / JOIN ─────────────────────────────────────────
   connection.on('member', (data) => {
-    const user     = data.uniqueId || 'Unknown';
+    const user = data.uniqueId || 'Unknown';
     const nickname = data.nickname || user;
-    const avatar   = data.profilePictureUrl || '';
-    const event    = { type: 'join', user, nickname, avatar, ts: Date.now() };
+    const avatar = data.profilePictureUrl || '';
+    const event = { type: 'join', user, nickname, avatar, ts: Date.now() };
 
     pushChat(event);
+    io.emit('alertEvent', event); // Kirim ke overlay Alert
     log(`👋 @${user} joined`);
   });
 
-  // ── FOLLOW ────────────────────────────────────────────────
+  // ── FOLLOW / SHARE ──────────────────────────────────────────
   connection.on('social', (data) => {
+    const user = data.uniqueId || 'Unknown';
+    const nickname = data.nickname || user;
+    const avatar = data.profilePictureUrl || '';
+    
     if (data.displayType === 'pm_mt_msg_viewer_follow' || data.displayType?.includes('follow')) {
-      const user     = data.uniqueId || 'Unknown';
-      const nickname = data.nickname || user;
       state.follows++;
-
-      const event = { type: 'follow', user, nickname, ts: Date.now() };
+      const event = { type: 'follow', user, nickname, avatar, ts: Date.now() };
       pushChat(event);
+      io.emit('alertEvent', event); // Kirim ke overlay Alert
       io.emit('stats', { viewers: state.viewers, likes: state.likes, follows: state.follows, shares: state.shares });
       log(`❤️  @${user} followed`);
     }
+    
     if (data.displayType?.includes('share')) {
       state.shares++;
+      const event = { type: 'share', user, nickname, avatar, ts: Date.now() };
+      pushChat(event);
+      io.emit('alertEvent', event); // Kirim ke overlay Alert
       io.emit('stats', { viewers: state.viewers, likes: state.likes, follows: state.follows, shares: state.shares });
+      log(`🔗 @${user} shared`);
     }
   });
 
@@ -182,6 +194,7 @@ async function startBot(username) {
 
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(() => {
+      if (!connection) return; // JANGAN lanjut jika bot sudah di-stop manual
       connection.connect().then(() => {
         state.connected = true;
         io.emit('botStatus', { connected: true, username });
@@ -204,7 +217,7 @@ async function startBot(username) {
 function stopBot() {
   clearTimeout(reconnectTimer);
   if (connection) {
-    try { connection.disconnect(); } catch (_) {}
+    try { connection.disconnect(); } catch (_) { }
     connection = null;
   }
   const state = global._state;
@@ -220,7 +233,7 @@ function getBotState() {
 // ── Push helpers ─────────────────────────────────────────────
 function pushChat(event) {
   const state = global._state;
-  const io    = global._io;
+  const io = global._io;
   state.chatLog.push(event);
   if (state.chatLog.length > 200) state.chatLog.shift();
   io.emit('chatEvent', event);
@@ -228,18 +241,18 @@ function pushChat(event) {
 
 function pushGift(event) {
   const state = global._state;
-  const io    = global._io;
+  const io = global._io;
   state.giftLog.push(event);
   if (state.giftLog.length > 100) state.giftLog.shift();
   io.emit('giftEvent', event);
-  io.emit('giftAlert', event);
+  io.emit('alertEvent', event);
 }
 
 // ── Bot command handlers ──────────────────────────────────────
 function handleCommand(event) {
-  const msg   = event.msg.trim();
+  const msg = event.msg.trim();
   const state = global._state;
-  const io    = global._io;
+  const io = global._io;
 
   // Check built-in commands
   for (const [trigger, fn] of Object.entries(BUILT_IN_COMMANDS)) {
@@ -263,9 +276,9 @@ function handleCommand(event) {
 }
 
 function handleSongRequest(event, args) {
-  const io    = global._io;
+  const io = global._io;
   const state = global._state;
-  const song  = args.trim();
+  const song = args.trim();
   if (!song) {
     io.emit('botReply', { user: event.user, msg: `@${event.nickname} → Tulis nama lagu setelah !sr, contoh: !sr Shape of You` });
     return;
@@ -278,26 +291,26 @@ function handleSongRequest(event, args) {
 }
 
 function handleQueueCmd(event) {
-  const io    = global._io;
+  const io = global._io;
   const state = global._state;
-  const len   = state.songQueue.length;
-  const msg   = len === 0
+  const len = state.songQueue.length;
+  const msg = len === 0
     ? '🎵 Antrian lagu kosong!'
     : `🎵 ${len} lagu dalam antrian. Gunakan !np untuk lagu sekarang.`;
   io.emit('botReply', { user: event.user, msg });
 }
 
 function handleNowPlayingCmd(event) {
-  const io    = global._io;
+  const io = global._io;
   const state = global._state;
-  const msg   = state.nowPlaying
+  const msg = state.nowPlaying
     ? `🎵 Sedang putar: "${state.nowPlaying.song}" (req by @${state.nowPlaying.requesterNick})`
     : '🎵 Tidak ada lagu yang sedang diputar.';
   io.emit('botReply', { user: event.user, msg });
 }
 
 function handleSkipCmd(event) {
-  const io    = global._io;
+  const io = global._io;
   const state = global._state;
   if (!event.verified) {
     io.emit('botReply', { user: event.user, msg: `@${event.nickname} Hanya moderator yang bisa skip lagu!` });

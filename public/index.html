@@ -187,7 +187,9 @@
       <div class="preview-modal-header">
         <span id="previewModalTitle">Preview</span>
         <div class="preview-modal-actions">
-          <button class="oc-btn preview" id="previewTestBtn" style="display:none;background:var(--accent);color:#fff"><i class="fas fa-play"></i> Test Alert</button>
+          <button class="oc-btn preview" id="testGiftBtn" style="display:none;background:var(--accent);color:#fff"><i class="fas fa-gift"></i> Test Gift</button>
+          <button class="oc-btn preview" id="testJoinBtn" style="display:none;background:#22c55e;color:#fff"><i class="fas fa-user-plus"></i> Test Join</button>
+          <button class="oc-btn preview" id="testFollowBtn" style="display:none;background:#fe2c55;color:#fff"><i class="fas fa-heart"></i> Test Follow</button>
           <span class="preview-size-hint">Transparent background = normal untuk OBS</span>
           <button class="oc-btn copy" id="previewCopyBtn"><i class="far fa-copy"></i> Copy URL</button>
           <a class="oc-btn open" id="previewOpenBtn" href="#" target="_blank"><i class="fas fa-external-link-alt"></i> Buka Tab</a>
@@ -196,20 +198,23 @@
       </div>
       <div class="preview-body">
         <div class="preview-settings" id="previewSettings" style="display:none">
-          <div class="ps-title"><i class="fas fa-sliders-h"></i> Pengaturan <span id="psOverlayName">Chat Overlay</span></div>
+          <div class="ps-title"><i class="fas fa-sliders-h"></i> Pengaturan <span id="psOverlayName">Overlay</span></div>
+          
+          <!-- SEKSI 1: TEMA (SELALU MUNCUL) -->
           <div class="ps-group">
             <label class="ps-label">Tema</label>
             <select id="psTheme" class="tb-input">
               <option value="dark">🌑 Dark</option>
               <option value="light">☀️ Light</option>
-              <option value="neon">💚 Neon</option>
+              <option value="neon" selected>💚 Neon</option>
               <option value="glass">🔮 Glass</option>
               <option value="minimal">⬛ Minimal</option>
               <option value="pink">🌸 Pink</option>
             </select>
           </div>
-          
-          <div id="psChatSettings">
+
+          <!-- SEKSI 2: CHAT SETTINGS (MUNCUL JIKA TYPE CHAT) -->
+          <div id="psChatSettings" style="display:none">
             <div class="ps-group mt-2">
               <label class="ps-label">Ukuran Font</label>
               <select id="psFontSize" class="tb-input">
@@ -221,15 +226,8 @@
               </select>
             </div>
             <div class="ps-group">
-              <label class="ps-label">Max Pesan di Overlay</label>
-              <select id="psChatMax" class="tb-input">
-                <option value="5">5 pesan</option>
-                <option value="10">10 pesan</option>
-                <option value="15">15 pesan</option>
-                <option value="20">20 pesan</option>
-                <option value="30" selected>30 pesan</option>
-                <option value="50">50 pesan</option>
-              </select>
+              <label class="ps-label">Max Pesan</label>
+              <input type="number" id="psChatMax" class="tb-input sm" value="30">
             </div>
             <div class="ps-group">
               <label class="ps-label">Tampilkan Event</label>
@@ -237,36 +235,67 @@
               <label class="toggle-label sm"><input type="checkbox" id="psShowJoin" checked><span>👋 Join</span></label>
               <label class="toggle-label sm"><input type="checkbox" id="psShowFollow" checked><span>❤️ Follow</span></label>
             </div>
-            <div class="ps-group">
-              <label class="ps-label">Animasi Masuk</label>
-              <select id="psAnimation" class="tb-input">
-                <option value="slideUp" selected>Slide Up</option>
-                <option value="fadeIn">Fade In</option>
-                <option value="popIn">Pop In</option>
-                <option value="slideLeft">Slide Left</option>
-              </select>
+          </div>
+
+          <!-- SEKSI 3: GIFT/ALERT SETTINGS (MUNCUL JIKA TYPE GIFT) -->
+          <div id="psGiftSettings" style="display:none">
+            <div class="ps-group mt-2" style="border-top:1px solid #333; padding-top:10px">
+              <label class="ps-label">Suara Join (URL)</label>
+              <input type="text" id="psSoundJoin" class="tb-input sm" placeholder="Link MP3">
             </div>
             <div class="ps-group">
-              <label class="ps-label">Posisi Chat</label>
-              <select id="psPosition" class="tb-input">
-                <option value="bottom" selected>Bawah ke Atas</option>
-                <option value="top">Atas ke Bawah</option>
-              </select>
+              <label class="ps-label">Suara Follow (URL)</label>
+              <input type="text" id="psSoundFollow" class="tb-input sm" placeholder="Link MP3">
             </div>
-            <div class="ps-group ps-row">
-              <div>
-                <label class="ps-label">Avatar</label>
-                <label class="switch"><input type="checkbox" id="psShowAvatar" checked><span class="slider"></span></label>
+            <div class="ps-group">
+              <label class="ps-label">Suara Gift (URL)</label>
+              <input type="text" id="psSoundGift" class="tb-input sm" placeholder="Link MP3">
+            </div>
+            <div class="ps-group">
+              <label class="ps-label">Volume & Alert</label>
+              <input type="range" id="psVolume" min="0" max="1" step="0.1" value="0.5" class="range-input">
+              <div class="mt-1">
+                <label class="toggle-label sm"><input type="checkbox" id="psShowJoinAlert" checked><span>👋 Join Pop-up</span></label>
+                <label class="toggle-label sm"><input type="checkbox" id="psShowFollowAlert" checked><span>❤️ Follow Pop-up</span></label>
               </div>
-              <div>
-                <label class="ps-label">Badge</label>
-                <label class="switch"><input type="checkbox" id="psShowBadge" checked><span class="slider"></span></label>
-              </div>
+            </div>
+            <div class="ps-group">
+              <label class="ps-label">Suara Bot (TTS)</label>
+              <label class="toggle-label sm"><input type="checkbox" id="psTtsGift" checked><span>🎙️ Gift</span></label>
+              <label class="toggle-label sm"><input type="checkbox" id="psTtsJoin" checked><span>🎙️ Join</span></label>
+            </div>
+          </div>
+
+          <!-- SEKSI 4: PENGATURAN UMUM -->
+          <div class="ps-group mt-2">
+            <label class="ps-label">Animasi Masuk</label>
+            <select id="psAnimation" class="tb-input">
+              <option value="slideUp" selected>Slide Up</option>
+              <option value="fadeIn">Fade In</option>
+              <option value="popIn">Pop In</option>
+              <option value="slideLeft">Slide Left</option>
+            </select>
+          </div>
+          <div class="ps-group">
+            <label class="ps-label">Posisi Overlay</label>
+            <select id="psPosition" class="tb-input">
+              <option value="bottom" selected>Bawah ke Atas</option>
+              <option value="top">Atas ke Bawah</option>
+            </select>
+          </div>
+          <div class="ps-group ps-row">
+            <div>
+              <label class="ps-label">Avatar</label>
+              <label class="switch"><input type="checkbox" id="psShowAvatar" checked><span class="slider"></span></label>
+            </div>
+            <div>
+              <label class="ps-label">Badge</label>
+              <label class="switch"><input type="checkbox" id="psShowBadge" checked><span class="slider"></span></label>
             </div>
           </div>
 
           <button class="btn btn-primary w100 mt-2" id="psApplyBtn"><i class="fas fa-check"></i> Terapkan Tema/Settings</button>
-          <p class="ps-note">Perubahan langsung aktif di overlay via Socket.IO</p>
+          <p class="ps-note">Perubahan langsung aktif via Socket.IO</p>
         </div>
         <div class="preview-frame-wrap">
           <iframe id="previewFrame" src="" frameborder="0" allowtransparency="true"></iframe>
@@ -444,6 +473,7 @@
               <input type="range" id="ttsVolume" min="0" max="1" step="0.1" value="1" class="range-input">
             </label>
             <button class="btn btn-primary" id="testTtsBtn"><i class="fas fa-play"></i> Test TTS</button>
+            <button class="btn btn-outline mt-2" id="ttsToggleBtn" style="width:100%"><i class="fas fa-microphone"></i> Aktifkan Suara Bot (TTS)</button>
           </div>
         </div>
 
@@ -486,6 +516,22 @@
               <input type="number" id="chatMaxOverlay" class="tb-input sm" value="30" min="5" max="100">
             </label>
             <label class="settings-row">
+              <span>Suara Join (MP3 URL)</span>
+              <input type="text" id="soundJoinInput" class="tb-input" placeholder="https://site.com/join.mp3">
+            </label>
+            <label class="settings-row">
+              <span>Suara Follow (MP3 URL)</span>
+              <input type="text" id="soundFollowInput" class="tb-input" placeholder="https://site.com/follow.mp3">
+            </label>
+            <label class="settings-row">
+              <span>Suara Gift (MP3 URL)</span>
+              <input type="text" id="soundGiftInput" class="tb-input" placeholder="https://site.com/gift.mp3">
+            </label>
+            <label class="settings-row">
+              <span>Suara Share (MP3 URL)</span>
+              <input type="text" id="soundShareInput" class="tb-input" placeholder="https://site.com/share.mp3">
+            </label>
+            <label class="settings-row">
               <span>SociaBuzz Username/URL</span>
               <input type="text" id="sociaBuzzInput" class="tb-input" placeholder="contoh: budi_gaming">
             </label>
@@ -496,6 +542,10 @@
             <label class="settings-row">
               <span>Proxy URL <small>(Bypass IP Block)</small></span>
               <input type="text" id="proxyInput" class="tb-input" placeholder="http://user:pass@host:port">
+            </label>
+            <label class="settings-row">
+              <span>Sign Server API Key <small>(EulerStream)</small></span>
+              <input type="text" id="signApiKeyInput" class="tb-input" placeholder="Dapatkan di eulerstream.com">
             </label>
           </div>
           <button class="btn btn-primary mt-2" id="saveSettingsBtn"><i class="fas fa-save"></i> Simpan Settings</button>

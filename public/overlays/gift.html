@@ -57,30 +57,93 @@ body.pink   .gift-name{color:#ff88b0}
 const socket = io();
 let queue    = [];
 let showing  = false;
+let alertSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'; // Fallback
+let alertShow = { join: true, follow: true };
+let sounds = {};
+let ttsVolume = 0.5;
 
-socket.on('init',     d => { if(d.settings?.overlayTheme) setTheme(d.settings.overlayTheme); });
-socket.on('settings', s => { if(s.overlayTheme) setTheme(s.overlayTheme); });
-socket.on('giftAlert', ev => { queue.push(ev); processQueue(); });
+socket.on('init',     d => { 
+  if(d.settings?.overlayTheme) setTheme(d.settings.overlayTheme); 
+  if(d.settings?.sounds)       sounds = d.settings.sounds;
+  if(d.settings?.ttsVolume)    ttsVolume = d.settings.ttsVolume;
+  if(d.settings?.alertShow)    alertShow = d.settings.alertShow;
+});
+socket.on('settings', s => { 
+  if(s.overlayTheme) setTheme(s.overlayTheme); 
+  if(s.sounds)       sounds = s.sounds;
+  if(s.ttsVolume)    ttsVolume = s.ttsVolume;
+  if(s.alertShow)    alertShow = s.alertShow;
+});
+socket.on('alertEvent', ev => { 
+  if (ev.type === 'join' && alertShow.join === false) return;
+  if (ev.type === 'follow' && alertShow.follow === false) return;
+  queue.push(ev); 
+  processQueue(); 
+});
+socket.on('giftAlert',  ev => { queue.push({...ev, type:'gift'}); processQueue(); }); 
 
 function setTheme(t){ document.getElementById('overlayBody').className = t; }
+
+function playSound(type) {
+  let url = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'; // Default
+
+  if (type === 'join' && sounds.join) url = sounds.join;
+  if (type === 'follow' && sounds.follow) url = sounds.follow;
+  if (type === 'gift' && sounds.gift) url = sounds.gift;
+  if (type === 'share' && sounds.share) url = sounds.share;
+
+  if (!url) return;
+  const audio = new Audio(url);
+  audio.volume = parseFloat(ttsVolume) || 0.5;
+  audio.play().catch(e => console.log('Audio play failed:', e));
+}
 
 function processQueue(){
   if(showing || !queue.length) return;
   showing = true;
   const ev = queue.shift();
+  playSound(ev.type); // Putar suara sesuai tipe
   showAlert(ev, ()=>{ showing=false; setTimeout(processQueue, 400); });
 }
 
 function showAlert(ev, done){
   const alert = document.getElementById('giftAlert');
-  document.getElementById('giftSender').textContent   = `dari @${ev.nickname||ev.user}`;
-  document.getElementById('giftName').textContent     = ev.gift || 'Gift';
-  document.getElementById('giftCount').textContent    = ev.count || 1;
-  document.getElementById('giftDiamonds').textContent = ev.diamonds || 0;
-
   const imgEl = document.getElementById('giftImg');
-  if(ev.giftImg){ imgEl.innerHTML = `<img src="${ev.giftImg}" onerror="this.outerHTML='🎁'">`; }
-  else { imgEl.textContent = '🎁'; }
+  const sender = document.getElementById('giftSender');
+  const name = document.getElementById('giftName');
+  const countWrap = document.querySelector('.gift-count');
+  const diamondWrap = document.querySelector('.diamonds');
+
+  // Reset display
+  countWrap.style.display = 'none';
+  diamondWrap.style.display = 'none';
+  alert.style.borderColor = '';
+
+  if (ev.type === 'gift') {
+    sender.textContent = `dari @${ev.nickname||ev.user}`;
+    name.textContent = ev.gift || 'Gift';
+    document.getElementById('giftCount').textContent = ev.count || 1;
+    document.getElementById('giftDiamonds').textContent = ev.diamonds || 0;
+    countWrap.style.display = 'flex';
+    diamondWrap.style.display = 'flex';
+    if(ev.giftImg){ imgEl.innerHTML = `<img src="${ev.giftImg}" onerror="this.outerHTML='🎁'">`; }
+    else { imgEl.textContent = '🎁'; }
+  } else if (ev.type === 'join') {
+    sender.textContent = 'Welcome!';
+    name.textContent = `@${ev.nickname||ev.user}`;
+    imgEl.textContent = '👋';
+    alert.style.borderColor = 'rgba(34,197,94,0.5)';
+  } else if (ev.type === 'follow') {
+    sender.textContent = 'New Follower!';
+    name.textContent = `@${ev.nickname||ev.user}`;
+    imgEl.textContent = '❤️';
+    alert.style.borderColor = 'rgba(254,44,85,0.5)';
+  } else if (ev.type === 'share') {
+    sender.textContent = 'Shared Live!';
+    name.textContent = `@${ev.nickname||ev.user}`;
+    imgEl.textContent = '🔗';
+    alert.style.borderColor = 'rgba(37,244,238,0.5)';
+  }
 
   spawnParticles();
   alert.className = 'gift-alert show';

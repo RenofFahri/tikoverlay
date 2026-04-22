@@ -174,16 +174,23 @@ app.post('/api/settings', (req, res) => {
 
 // Test Alert
 app.post('/api/test-alert', (req, res) => {
-  const mockGift = {
-    type: 'gift',
+  const { type } = req.query; // Ambil tipe dari URL: ?type=join atau ?type=follow
+  
+  let mockEvent = {
+    type: type || 'gift',
     nickname: 'User_Testing',
     user: 'usertesting',
-    gift: 'Mawar',
-    count: Math.floor(Math.random() * 10) + 1,
-    diamonds: 1,
-    avatar: 'https://p16-sign-va.tiktokcdn.com/tos-maliva-avt-0068/e43ea7b311742468d6015a13c9bb2836~c5_100x100.jpeg?x-expires=1680145200&x-signature=XXX'
+    ts: Date.now()
   };
-  io.emit('giftAlert', mockGift);
+
+  if (mockEvent.type === 'gift') {
+    mockEvent.gift = 'Mawar';
+    mockEvent.count = Math.floor(Math.random() * 10) + 1;
+    mockEvent.diamonds = 1;
+    mockEvent.giftImg = 'https://p16-sign-va.tiktokcdn.com/obj/tiktokaudio/68d6015a13c9bb2836~c5_100x100.jpeg'; 
+  }
+
+  io.emit('alertEvent', mockEvent);
   res.json({ ok: true });
 });
 
@@ -239,6 +246,9 @@ srv.listen(PORT, () => {
   console.log(`║   Chat OVL  : http://localhost:${PORT}/overlay/chat  ║`);
   console.log(`║   Gift OVL  : http://localhost:${PORT}/overlay/gift  ║`);
   console.log(`║   LBoard OVL: http://localhost:${PORT}/overlay/leaderboard ║`);
+  console.log(`║   Song OVL  : http://localhost:${PORT}/overlays/song.html ║`);
+  console.log(`║   QR OVL    : http://localhost:${PORT}/overlays/qr.html ║`);
+  console.log(`║   Goal OVL  : http://localhost:${PORT}/overlays/goal.html ║`);
   console.log('╚══════════════════════════════════════════════╝');
   console.log('');
 });
