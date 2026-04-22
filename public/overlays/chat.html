@@ -55,7 +55,10 @@ body.pink .event-join { border-color: #ff6496!important; }
 const socket = io({
   reconnection: true,
   reconnectionAttempts: Infinity,
-  reconnectionDelay: 1000
+  reconnectionDelay: 1000,
+  extraHeaders: {
+    'ngrok-skip-browser-warning': 'true'
+  }
 });
 
 let MAX    = 30;

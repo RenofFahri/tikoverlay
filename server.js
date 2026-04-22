@@ -26,6 +26,12 @@ const app  = express();
 const srv  = http.createServer(app);
 const io   = new Server(srv, { cors: { origin: '*' } });
 
+// Middleware untuk melewati peringatan Ngrok (Browser Warning)
+app.use((req, res, next) => {
+  res.setHeader('ngrok-skip-browser-warning', 'true');
+  next();
+});
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -195,6 +201,22 @@ app.post('/api/test-alert', (req, res) => {
 });
 
 // ── Socket.IO connections ─────────────────────────────────────
+app.post('/api/leaderboard/reset', (req, res) => {
+  state.leaderboard = {}; // Kosongkan data diamond
+  state.likes = 0;
+  state.follows = 0;
+  state.shares = 0;
+  
+  // Reset progress di setiap user data (jika ada)
+  saveData();
+  
+  // Beritahu semua overlay untuk update (Goal, Leaderboard, dll)
+  io.emit('leaderboard', buildLeaderboard());
+  io.emit('stats', { likes: 0, follows: 0, viewers: state.viewers, shares: 0 });
+  
+  res.json({ ok: true, message: 'Leaderboard & Goal reset successfully' });
+});
+
 io.on('connection', (socket) => {
   // Send current state to new client
   socket.emit('init', {

@@ -57,7 +57,14 @@ body.pink .lb-diamonds{color:#ff88b0}
 </div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  extraHeaders: {
+    'ngrok-skip-browser-warning': 'true'
+  }
+});
 socket.on('init',        d => { if(d.settings?.overlayTheme) setTheme(d.settings.overlayTheme); render(d.leaderboard||[]); });
 socket.on('settings',    s => { if(s.overlayTheme) setTheme(s.overlayTheme); });
 socket.on('leaderboard', d => render(d));

@@ -623,6 +623,14 @@ document.getElementById('mainTabs').onclick = e => {
 // ── Chat toolbar ──────────────────────────────────────────────
 document.getElementById('clearChatBtn').onclick = () => { document.getElementById('chatLog').innerHTML = ''; toast('Chat dibersihkan', 'info'); };
 document.getElementById('clearGiftBtn').onclick = () => { document.getElementById('giftLog').innerHTML = ''; toast('Gift log dibersihkan', 'info'); };
+
+document.getElementById('resetLeaderboardBtn').onclick = async () => {
+  if (!confirm('Yakin ingin reset semua koin/diamond di leaderboard? Data tidak bisa dikembalikan.')) return;
+  const res = await fetch('/api/leaderboard/reset', { method: 'POST' });
+  if (res.ok) {
+    toast('Leaderboard berhasil di-reset!', 'success');
+  }
+};
 document.getElementById('autoscrollChat').onchange = e => autoscroll = e.target.checked;
 document.getElementById('chatFilter').oninput = e => chatFilter = e.target.value.toLowerCase();
 
