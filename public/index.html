@@ -153,6 +153,18 @@
         <a class="oc-btn open" id="olSongOpen" href="#" target="_blank" title="Buka di tab baru"><i class="fas fa-external-link-alt"></i></a>
       </div>
     </div>
+    <div class="overlay-card" id="olQueue">
+      <div class="overlay-card-icon" style="color:#1db954;background:rgba(29,185,84,0.15)"><i class="fas fa-list-ul"></i></div>
+      <div class="overlay-card-info">
+        <div class="overlay-card-title">Song Queue Overlay</div>
+        <div class="overlay-card-url" id="olQueueUrl"></div>
+      </div>
+      <div class="overlay-card-actions">
+        <button class="oc-btn preview" onclick="previewOverlay('queue.html','Song Queue Overlay', true)" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+        <button class="oc-btn copy" onclick="copyOverlay('queue.html', true)" title="Copy URL"><i class="far fa-copy"></i> Copy</button>
+        <a class="oc-btn open" id="olQueueOpen" href="#" target="_blank" title="Buka di tab baru"><i class="fas fa-external-link-alt"></i></a>
+      </div>
+    </div>
     <div class="overlay-card" id="olQr">
       <div class="overlay-card-icon" style="color:#ffc107;background:rgba(255,193,7,0.15)"><i class="fas fa-qrcode"></i></div>
       <div class="overlay-card-info">
@@ -190,6 +202,8 @@
           <button class="oc-btn preview" id="testGiftBtn" style="display:none;background:var(--accent);color:#fff"><i class="fas fa-gift"></i> Test Gift</button>
           <button class="oc-btn preview" id="testJoinBtn" style="display:none;background:#22c55e;color:#fff"><i class="fas fa-user-plus"></i> Test Join</button>
           <button class="oc-btn preview" id="testFollowBtn" style="display:none;background:#fe2c55;color:#fff"><i class="fas fa-heart"></i> Test Follow</button>
+          <button class="oc-btn preview" id="testSongBtn" style="display:none;background:var(--accent2);color:#fff"><i class="fas fa-music"></i> Test Dummy</button>
+          <button class="oc-btn preview" id="testQueueBtn" style="display:none;background:#1db954;color:#fff"><i class="fas fa-list-ul"></i> Test Dummy Queue</button>
           <span class="preview-size-hint">Transparent background = normal untuk OBS</span>
           <button class="oc-btn copy" id="previewCopyBtn"><i class="far fa-copy"></i> Copy URL</button>
           <a class="oc-btn open" id="previewOpenBtn" href="#" target="_blank"><i class="fas fa-external-link-alt"></i> Buka Tab</a>
@@ -266,7 +280,20 @@
             </div>
           </div>
 
-          <!-- SEKSI 4: PENGATURAN UMUM -->
+          <!-- SEKSI 4: GOAL SETTINGS -->
+          <div id="psGoalSettings" style="display:none">
+            <div class="ps-group mt-2">
+              <label class="ps-label">Bentuk Goal</label>
+              <select id="psGoalModel" class="tb-input">
+                <option value="goal.html">Horizontal Bar</option>
+                <option value="goal_speedometer.html">Speedometer</option>
+                <option value="goal_circular.html">Circular</option>
+                <option value="goal_vertical.html">Vertical Battery</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- SEKSI 5: PENGATURAN UMUM -->
           <div class="ps-group mt-2">
             <label class="ps-label">Animasi Masuk</label>
             <select id="psAnimation" class="tb-input">
@@ -300,10 +327,9 @@
         <div class="preview-frame-wrap">
           <iframe id="previewFrame" src="" frameborder="0" allowtransparency="true"></iframe>
         </div>
-      </div>
-    </div>
-  </div>
-
+      </div> <!-- preview-body -->
+    </div> <!-- preview-modal-inner -->
+  </div> <!-- preview-modal -->
 
   <!-- ══════════════════════════════════════════════ -->
   <!--  TABS + CONTENT                                -->
@@ -313,6 +339,7 @@
       <button class="tab-btn active" data-tab="chat" role="tab"><i class="fas fa-comments"></i> Chat</button>
       <button class="tab-btn" data-tab="gifts" role="tab"><i class="fas fa-gift"></i> Gifts</button>
       <button class="tab-btn" data-tab="songs" role="tab"><i class="fas fa-music"></i> Song Queue</button>
+      <button class="tab-btn spotify-tab-btn" data-tab="spotify" role="tab"><i class="fab fa-spotify"></i> Spotify</button>
       <button class="tab-btn" data-tab="leaderboard" role="tab"><i class="fas fa-crown"></i> Leaderboard</button>
       <button class="tab-btn" data-tab="commands" role="tab"><i class="fas fa-terminal"></i> Bot Commands</button>
       <button class="tab-btn" data-tab="settings" role="tab"><i class="fas fa-cog"></i> Settings</button>
@@ -380,7 +407,133 @@
       </div>
     </div>
 
-    <!-- ─── LEADERBOARD TAB ──────────────────────── -->
+    <!-- ─── SPOTIFY TAB ──────────────────────────────── -->
+    <div class="tab-panel" id="tab-spotify">
+
+      <!-- SETUP PANEL -->
+      <div id="spotifySetupPanel" class="spotify-setup-panel">
+        <div class="spotify-hero">
+          <div class="spotify-hero-icon"><i class="fab fa-spotify"></i></div>
+          <h2 class="spotify-hero-title">Hubungkan Spotify</h2>
+          <p class="spotify-hero-sub">Request lagu dari penonton akan otomatis diputar di Spotify</p>
+        </div>
+        <div class="spotify-setup-form">
+          <div class="sp-form-row">
+            <label class="sp-label">Tipe Akun (Mode)</label>
+            <select id="spMode" class="tb-input" onchange="updateSpNote()">
+              <option value="free">Spotify Free (Preview 30s)</option>
+              <option value="premium">Spotify Premium (Full Control)</option>
+            </select>
+          </div>
+          <div class="sp-form-row">
+            <label class="sp-label">Client ID <a href="https://developer.spotify.com/dashboard" target="_blank" class="sp-link"><i class="fas fa-external-link-alt"></i></a></label>
+            <input type="text" id="spClientId" class="tb-input" placeholder="Paste Spotify App Client ID...">
+          </div>
+          <div class="sp-form-row">
+            <label class="sp-label">Client Secret</label>
+            <input type="password" id="spClientSecret" class="tb-input" placeholder="Paste Spotify App Client Secret...">
+          </div>
+          <div class="sp-form-row">
+            <label class="sp-label">Auto-Play saat !sr</label>
+            <label class="switch"><input type="checkbox" id="spAutoPlay" checked><span class="slider"></span></label>
+          </div>
+          <p class="sp-note" id="spNoteText"><i class="fas fa-info-circle"></i> Mode Free: 100% gratis, memutar preview lagu 30 detik di browser dashboard. Tidak butuh login Spotify.</p>
+          <script>
+            function updateSpNote() {
+              const mode = document.getElementById('spMode').value;
+              const note = document.getElementById('spNoteText');
+              if(mode === 'free') note.innerHTML = '<i class="fas fa-info-circle"></i> Mode Free: 100% gratis, memutar preview lagu 30 detik di browser dashboard. Tidak butuh login Spotify.';
+              else note.innerHTML = '<i class="fas fa-info-circle"></i> Mode Premium: Full control player. Tambahkan <strong>http://localhost:3000/spotify/callback</strong> sebagai Redirect URI di Dashboard Spotify. Harus login.';
+            }
+          </script>
+          <div class="sp-form-actions">
+            <button class="btn btn-spotify" id="spSaveBtn"><i class="fas fa-save"></i> Simpan & Hubungkan</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PLAYER PANEL -->
+      <div id="spotifyPlayerPanel" class="spotify-player-panel" style="display:none">
+
+        <!-- NOW PLAYING -->
+        <div class="sp-now-playing" id="spNowPlaying">
+          <div class="sp-album-art" id="spAlbumArt">
+            <div class="sp-album-placeholder"><i class="fas fa-music"></i></div>
+          </div>
+          <div class="sp-track-info">
+            <div class="sp-track-name" id="spTrackName">Tidak ada lagu</div>
+            <div class="sp-track-artist" id="spTrackArtist">—</div>
+            <div class="sp-track-album" id="spTrackAlbum"></div>
+            <a class="sp-open-link" id="spOpenLink" href="#" target="_blank" style="display:none">
+              <i class="fab fa-spotify"></i> Buka di Spotify
+            </a>
+          </div>
+          <div class="sp-status-badge" id="spStatusBadge">
+            <span class="sp-pulse"></span> <span id="spStatusText">—</span>
+          </div>
+        </div>
+
+        <!-- PROGRESS BAR -->
+        <div class="sp-progress-wrap">
+          <span class="sp-time" id="spTimeProgress">0:00</span>
+          <div class="sp-progress-bar" id="spProgressBar">
+            <div class="sp-progress-fill" id="spProgressFill" style="width:0%"></div>
+          </div>
+          <span class="sp-time" id="spTimeDuration">0:00</span>
+        </div>
+
+        <!-- CONTROLS -->
+        <div class="sp-controls">
+          <button class="sp-ctrl-btn" id="spPrevBtn" title="Previous"><i class="fas fa-step-backward"></i></button>
+          <button class="sp-ctrl-btn sp-play-btn" id="spPlayBtn" title="Play/Pause">
+            <i class="fas fa-play" id="spPlayIcon"></i>
+          </button>
+          <button class="sp-ctrl-btn" id="spNextBtn" title="Next"><i class="fas fa-step-forward"></i></button>
+          <div class="sp-volume-wrap">
+            <i class="fas fa-volume-up sp-vol-icon"></i>
+            <input type="range" id="spVolumeSlider" min="0" max="100" value="50" class="sp-volume-slider">
+            <span id="spVolumeVal">50%</span>
+          </div>
+        </div>
+
+        <!-- SEARCH -->
+        <div class="sp-search-section">
+          <h3 class="section-title"><i class="fas fa-search"></i> Cari & Putar Lagu</h3>
+          <div class="sp-search-row">
+            <input type="text" id="spSearchInput" class="tb-input" placeholder="Cari lagu, artis, album...">
+            <button class="btn btn-spotify" id="spSearchBtn"><i class="fas fa-search"></i> Cari</button>
+          </div>
+          <div class="sp-search-results" id="spSearchResults"></div>
+        </div>
+
+        <!-- QUEUE -->
+        <div class="sp-queue-section mt-3">
+          <h3 class="section-title"><i class="fas fa-list-ul"></i> Antrean Lagu (Playlist) <button class="tb-btn sm" id="spClearQueueBtn" style="margin-left:auto; display:none"><i class="fas fa-trash"></i> Bersihkan</button></h3>
+          <div class="sp-queue-list" id="spQueueList">
+            <div class="empty-state"><i class="fas fa-music"></i><span>Antrean kosong</span></div>
+          </div>
+        </div>
+
+        <!-- DEVICES -->
+        <div class="sp-devices-section" id="spDevicesSection" style="display:none">
+          <h3 class="section-title"><i class="fas fa-laptop"></i> Perangkat <button class="tb-btn sm" id="spRefreshDevices"><i class="fas fa-sync"></i></button></h3>
+          <div class="sp-devices-list" id="spDevicesList"><div class="empty-state"><i class="fas fa-laptop"></i><span>Klik refresh untuk muat perangkat</span></div></div>
+        </div>
+
+        <!-- FOOTER ACTIONS -->
+        <div class="sp-footer-actions">
+          <div class="sp-auto-wrap">
+            <label class="toggle-label">
+              <input type="checkbox" id="spAutoPlayToggle" checked>
+              <span><i class="fab fa-spotify" style="color:#1db954"></i> Auto-play saat !sr</span>
+            </label>
+          </div>
+          <button class="btn btn-outline sm" id="spLogoutBtn"><i class="fas fa-sign-out-alt"></i> Disconnect Spotify</button>
+        </div>
+      </div>
+    </div>
+
+
     <div class="tab-panel" id="tab-leaderboard">
       <div class="leaderboard-header">
         <h3 class="section-title"><i class="fas fa-crown"></i> Top Gift Senders</h3>

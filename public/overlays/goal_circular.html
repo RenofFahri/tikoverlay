@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Gift Goal Circular</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:transparent;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+
+.circular-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 14, 20, 0.85);
+  border-radius: 50%;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+svg {
+  transform: rotate(-90deg);
+  width: 180px;
+  height: 180px;
+}
+
+circle {
+  fill: none;
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+
+.bg-circle {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.fill-circle {
+  stroke: #25f4ee;
+  stroke-dasharray: 502; /* 2 * PI * 80 */
+  stroke-dashoffset: 502;
+  transition: stroke-dashoffset 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 0 8px rgba(37, 244, 238, 0.6));
+}
+
+.content {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.goal-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #a0a8c0;
+  letter-spacing: 1px;
+}
+
+.goal-val {
+  font-size: 32px;
+  font-weight: 900;
+  color: #fff;
+  margin: 2px 0;
+}
+
+.goal-target {
+  font-size: 12px;
+  color: #25f4ee;
+  font-weight: 700;
+}
+
+.gem-icon {
+  font-size: 16px;
+  color: #fe2c55;
+  margin-bottom: 5px;
+}
+
+/* THEMES */
+body.neon .fill-circle { stroke: #00ff88; filter: drop-shadow(0 0 10px #00ff88); }
+body.neon .goal-target { color: #00ff88; }
+
+body.pink .fill-circle { stroke: #ff6496; filter: drop-shadow(0 0 10px #ff6496); }
+body.pink .goal-target { color: #ff6496; }
+
+body.glass .circular-container { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.2); }
+</style>
+</head>
+<body class="dark" id="overlayBody">
+
+<div class="circular-container">
+  <svg>
+    <circle class="bg-circle" cx="90" cy="90" r="80"></circle>
+    <circle class="fill-circle" id="goalCircle" cx="90" cy="90" r="80"></circle>
+  </svg>
+  <div class="content">
+    <div class="gem-icon"><i class="fas fa-gem"></i></div>
+    <div class="goal-label" id="goalLabel">Gift Goal</div>
+    <div class="goal-val" id="goalCurrent">0</div>
+    <div class="goal-target" id="goalTarget">1K</div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  extraHeaders: { 'ngrok-skip-browser-warning': 'true' }
+});
+
+function fmtNum(n) { return n >= 1000 ? (n/1000).toFixed(1)+'K' : n; }
+
+socket.on('init', d => {
+  if(d.settings?.overlayTheme) document.getElementById('overlayBody').className = d.settings.overlayTheme;
+  if(d.giftGoal) updateGoal(d.giftGoal);
+});
+
+socket.on('settings', s => {
+  if(s.overlayTheme) document.getElementById('overlayBody').className = s.overlayTheme;
+});
+
+socket.on('giftGoal', g => {
+  updateGoal(g);
+});
+
+function updateGoal(g) {
+  if (!g) return;
+  document.getElementById('goalLabel').textContent = g.label || 'Gift Goal';
+  document.getElementById('goalCurrent').textContent = fmtNum(g.current || 0);
+  document.getElementById('goalTarget').textContent = fmtNum(g.target || 1000);
+  
+  const pct = Math.min(100, Math.round(((g.current || 0) / (g.target || 1)) * 100));
+  const circle = document.getElementById('goalCircle');
+  const circumference = 2 * Math.PI * 80;
+  const offset = circumference - (pct / 100) * circumference;
+  circle.style.strokeDashoffset = offset;
+}
+</script>
+</body>
+</html>

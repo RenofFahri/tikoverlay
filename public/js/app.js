@@ -24,22 +24,41 @@ function setOverlayUrls() {
     gift: `${BASE}/overlay/gift`,
     leaderboard: `${BASE}/overlay/leaderboard`,
     song: `${BASE}/overlays/song.html`,
+    queue: `${BASE}/overlays/queue.html`,
     qr: `${BASE}/overlays/qr.html`,
-    goal: `${BASE}/overlays/goal.html`
+    goal: `${BASE}/overlays/goal.html`,
+    goalSpeedo: `${BASE}/overlays/goal_speedometer.html`,
+    goalCircle: `${BASE}/overlays/goal_circular.html`,
+    goalVertical: `${BASE}/overlays/goal_vertical.html`
   };
   document.getElementById('olChatUrl').textContent = urls.chat;
   document.getElementById('olGiftUrl').textContent = urls.gift;
   document.getElementById('olLeaderboardUrl').textContent = urls.leaderboard;
   document.getElementById('olSongUrl').textContent = urls.song;
+  document.getElementById('olQueueUrl').textContent = urls.queue;
   document.getElementById('olQrUrl').textContent = urls.qr;
   document.getElementById('olGoalUrl').textContent = urls.goal;
+  const elUrlSpeedo = document.getElementById('olGoalSpeedoUrl');
+  if (elUrlSpeedo) elUrlSpeedo.textContent = urls.goalSpeedo;
+  const elUrlCircle = document.getElementById('olGoalCircleUrl');
+  if (elUrlCircle) elUrlCircle.textContent = urls.goalCircle;
+  const elUrlVertical = document.getElementById('olGoalVerticalUrl');
+  if (elUrlVertical) elUrlVertical.textContent = urls.goalVertical;
 
   document.getElementById('olChatOpen').href = urls.chat;
   document.getElementById('olGiftOpen').href = urls.gift;
   document.getElementById('olLeaderboardOpen').href = urls.leaderboard;
   document.getElementById('olSongOpen').href = urls.song;
+  document.getElementById('olQueueOpen').href = urls.queue;
   document.getElementById('olQrOpen').href = urls.qr;
-  document.getElementById('olGoalOpen').href = urls.goal;
+  const elOpenGoal = document.getElementById('olGoalOpen');
+  if (elOpenGoal) elOpenGoal.href = urls.goal;
+  const elOpenSpeedo = document.getElementById('olGoalSpeedoOpen');
+  if (elOpenSpeedo) elOpenSpeedo.href = urls.goalSpeedo;
+  const elOpenCircle = document.getElementById('olGoalCircleOpen');
+  if (elOpenCircle) elOpenCircle.href = urls.goalCircle;
+  const elOpenVertical = document.getElementById('olGoalVerticalOpen');
+  if (elOpenVertical) elOpenVertical.href = urls.goalVertical;
 
   document.getElementById('urlChat').textContent = urls.chat;
   document.getElementById('urlGift').textContent = urls.gift;
@@ -50,6 +69,8 @@ function setOverlayUrls() {
   if (urlQrEl) urlQrEl.textContent = urls.qr;
   const urlGoalEl = document.getElementById('urlGoal');
   if (urlGoalEl) urlGoalEl.textContent = urls.goal;
+  const urlGoalSpeedoEl = document.getElementById('urlGoalSpeedo');
+  if (urlGoalSpeedoEl) urlGoalSpeedoEl.textContent = urls.goalSpeedo;
 }
 setOverlayUrls();
 
@@ -74,14 +95,37 @@ window.previewOverlay = function (type, title, isDirectFile) {
   const isChat = type === 'chat';
   const isGift = type === 'gift' || type === 'gift.html';
 
+  const isGoal = type.includes('goal');
+
   document.getElementById('psChatSettings').style.display = isChat ? 'block' : 'none';
   document.getElementById('psGiftSettings').style.display = isGift ? 'block' : 'none';
+  document.getElementById('psGoalSettings').style.display = isGoal ? 'block' : 'none';
+
+  if (isGoal) {
+    document.getElementById('psGoalModel').value = type;
+    document.getElementById('psGoalModel').onchange = (e) => {
+      const newType = e.target.value;
+      const newUrl = `${BASE}/overlays/${newType}`;
+      document.getElementById('previewFrame').src = newUrl;
+      document.getElementById('previewOpenBtn').href = newUrl;
+      document.getElementById('previewCopyBtn').onclick = () =>
+        navigator.clipboard.writeText(newUrl).then(() => toast('URL disalin!', 'success'));
+    };
+  }
 
   // Show test buttons for gift overlay
   const giftBtn = document.getElementById('testGiftBtn');
   const joinBtn = document.getElementById('testJoinBtn');
   const followBtn = document.getElementById('testFollowBtn');
+  const songBtn = document.getElementById('testSongBtn');
+  const queueBtn = document.getElementById('testQueueBtn');
   
+  giftBtn.style.display = 'none';
+  joinBtn.style.display = 'none';
+  followBtn.style.display = 'none';
+  songBtn.style.display = 'none';
+  queueBtn.style.display = 'none';
+
   if (isGift) {
     giftBtn.style.display = 'inline-flex';
     joinBtn.style.display = 'inline-flex';
@@ -100,10 +144,12 @@ window.previewOverlay = function (type, title, isDirectFile) {
     document.getElementById('psShowFollowAlert').checked = settings.alertShow?.follow !== false;
     document.getElementById('psTtsGift').checked = settings.tts?.gift !== false;
     document.getElementById('psTtsJoin').checked = settings.tts?.join !== false;
-  } else {
-    giftBtn.style.display = 'none';
-    joinBtn.style.display = 'none';
-    followBtn.style.display = 'none';
+  } else if (type === 'song.html') {
+    songBtn.style.display = 'inline-flex';
+    songBtn.onclick = () => fetch('/api/test-alert?type=song', { method: 'POST' });
+  } else if (type === 'queue.html') {
+    queueBtn.style.display = 'inline-flex';
+    queueBtn.onclick = () => fetch('/api/test-alert?type=queue', { method: 'POST' });
   }
 
   // Sync sidebar values from current settings
@@ -665,3 +711,506 @@ function toast(msg, type = 'info') {
 
 // ── Utils ─────────────────────────────────────────────────────
 function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+// ══════════════════════════════════════════════════════════════
+//  SPOTIFY INTEGRATION (DUAL MODE)
+// ══════════════════════════════════════════════════════════════
+
+let spState = {
+  isAuthenticated: false,
+  isConfigured   : false,
+  mode           : 'free',
+  isPlaying      : false,
+  currentTrack   : null,
+  volume         : 50,
+  progress       : 0,
+  duration       : 0,
+};
+
+// For Free Mode Local Playback
+const spAudio = new Audio();
+spAudio.volume = 0.5;
+let spProgressTimer = null;
+
+// ── Load spotify status on init ───────────────────────────────
+async function initSpotify() {
+  try {
+    const r = await fetch('/api/spotify/status');
+    const d = await r.json();
+    spState.mode = d.settings?.mode || 'free';
+    updateSpotifyUI(d);
+    
+    // Initial fetch of queue status
+    fetch('/api/spotify/status').then(res => res.json()).then(data => {
+      // Though /status may not have queue, we can rely on socket init
+    });
+    
+    if (d.settings) {
+      document.getElementById('spMode').value            = d.settings.mode || 'free';
+      if (typeof updateSpNote === 'function') updateSpNote();
+      document.getElementById('spClientId').value        = d.settings.clientId || '';
+      document.getElementById('spClientSecret').value    = d.settings.clientSecret || '';
+      document.getElementById('spAutoPlay').checked      = d.settings.autoPlay !== false;
+      document.getElementById('spAutoPlayToggle').checked = d.settings.autoPlay !== false;
+    }
+    
+    // Resume UI state but don't auto-play audio on reload
+    if (d.nowPlaying) {
+      updateNowPlayingCard(d.nowPlaying);
+    }
+  } catch (e) {
+    console.warn('Spotify init error:', e);
+  }
+}
+initSpotify();
+
+// ── Socket events ─────────────────────────────────────────────
+socket.on('spotifyStatus', d => updateSpotifyUI(d));
+socket.on('spotifyPlayPreview', track => spPlayLocal(track));
+socket.on('spotifyStopPreview', () => spStopLocal());
+socket.on('spotifyNowPlaying', d => {
+  if (spState.mode === 'premium') updateNowPlayingCard(d);
+});
+
+// ── Update UI based on auth/config state ──────────────────────
+function updateSpotifyUI(d) {
+  spState.isAuthenticated = !!d?.isAuthenticated;
+  spState.isConfigured    = !!d?.isConfigured;
+  spState.mode            = d?.mode || spState.mode;
+
+  const setup  = document.getElementById('spotifySetupPanel');
+  const player = document.getElementById('spotifyPlayerPanel');
+  const devs   = document.getElementById('spDevicesSection');
+  if (!setup || !player) return;
+
+  if (spState.isAuthenticated) {
+    setup.style.display  = 'none';
+    player.style.display = 'flex';
+    if (spState.mode === 'premium') {
+      if (devs) devs.style.display = 'block';
+    } else {
+      if (devs) devs.style.display = 'none';
+    }
+  } else {
+    setup.style.display  = 'flex';
+    player.style.display = 'none';
+  }
+}
+
+// ── Setup form: Save credentials ─────────────────────────────
+document.getElementById('spSaveBtn').onclick = async () => {
+  const mode         = document.getElementById('spMode').value;
+  const clientId     = document.getElementById('spClientId').value.trim();
+  const clientSecret = document.getElementById('spClientSecret').value.trim();
+  const autoPlay     = document.getElementById('spAutoPlay').checked;
+  const redirectUri  = window.location.origin + '/spotify/callback';
+  
+  if (!clientId || !clientSecret) return toast('Isi Client ID dan Client Secret!', 'error');
+
+  const btn = document.getElementById('spSaveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menghubungkan...';
+
+  const r = await fetch('/api/spotify/credentials', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode, clientId, clientSecret, autoPlay, redirectUri }),
+  });
+  const d = await r.json();
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fas fa-save"></i> Simpan & Hubungkan';
+
+  if (!d.ok) return toast('Gagal setup: ' + d.error, 'error');
+  
+  if (mode === 'premium') {
+    toast('Membuka halaman login Spotify...', 'info');
+    spOpenLoginWindow();
+  } else {
+    toast('✅ Spotify terhubung (Free Mode)!', 'success');
+    initSpotify();
+  }
+};
+
+function spOpenLoginWindow() {
+  const w = window.open('/spotify/login', 'SpotifyLogin', 'width=500,height=700,resizable=yes');
+  const listener = (e) => {
+    if (e.data?.spotifyAuth === 'success') {
+      toast('✅ Spotify Premium terhubung!', 'success');
+      initSpotify();
+      window.removeEventListener('message', listener);
+    } else if (e.data?.spotifyAuth === 'error') {
+      toast('❌ Gagal connect Spotify: ' + (e.data.error || 'unknown'), 'error');
+      window.removeEventListener('message', listener);
+    }
+  };
+  window.addEventListener('message', listener);
+}
+
+// ── Local Audio Playback (Free Mode) ──────────────────────────
+function spPlayLocal(track) {
+  if (spState.mode !== 'free') return;
+  if (!track || !track.preview) return toast('Tidak ada URL preview.', 'error');
+  
+  spState.currentTrack = track;
+  spState.isPlaying = true;
+  spAudio.src = track.preview;
+  spAudio.play().catch(e => console.warn('Audio play error:', e));
+
+  updateNowPlayingCard({ track, isPlaying: true });
+}
+
+function spStopLocal() {
+  spState.isPlaying = false;
+  spAudio.pause();
+  updateNowPlayingCard(null);
+}
+
+spAudio.addEventListener('ended', () => {
+  if (spState.mode !== 'free') return;
+  spState.isPlaying = false;
+  document.getElementById('spPlayIcon').className = 'fas fa-play';
+  document.getElementById('spStatusText').textContent = 'Paused';
+  const pulse = document.querySelector('.sp-pulse');
+  if (pulse) pulse.classList.add('paused');
+  fetch('/api/spotify/stop-preview', { method: 'POST' });
+});
+
+spAudio.addEventListener('timeupdate', () => {
+  if (spState.mode !== 'free') return;
+  const progMs = (spAudio.currentTime || 0) * 1000;
+  const durMs  = (spAudio.duration || 30) * 1000;
+  updateProgress(progMs, durMs);
+});
+
+// ── Now playing card update (Dual Mode) ───────────────────────
+function updateNowPlayingCard(data) {
+  if (!data || !data.track) {
+    document.getElementById('spTrackName').textContent   = 'Tidak ada lagu';
+    document.getElementById('spTrackArtist').textContent = '—';
+    document.getElementById('spTrackAlbum').textContent  = '';
+    document.getElementById('spAlbumArt').innerHTML = '<div class="sp-album-placeholder"><i class="fas fa-music"></i></div>';
+    document.getElementById('spOpenLink').style.display  = 'none';
+    document.getElementById('spStatusText').textContent  = '—';
+    document.getElementById('spPlayIcon').className      = 'fas fa-play';
+    document.getElementById('spProgressFill').style.width = '0%';
+    document.getElementById('spTimeProgress').textContent = '0:00';
+    document.getElementById('spTimeDuration').textContent  = '0:00';
+    const pulse = document.querySelector('.sp-pulse');
+    if (pulse) pulse.classList.add('paused');
+    stopProgressTimer();
+    spState.isPlaying = false;
+    return;
+  }
+
+  const t = data.track;
+  document.getElementById('spTrackName').textContent   = t.name || '—';
+  document.getElementById('spTrackArtist').textContent = t.artists || '—';
+  document.getElementById('spTrackAlbum').textContent  = t.album  || '';
+
+  const artEl = document.getElementById('spAlbumArt');
+  if (t.albumArt) {
+    artEl.innerHTML = `<img src="${t.albumArt}" alt="${escHtml(t.name)}">`;
+  } else {
+    artEl.innerHTML = '<div class="sp-album-placeholder"><i class="fas fa-music"></i></div>';
+  }
+
+  const link = document.getElementById('spOpenLink');
+  if (t.externalUrl) {
+    link.href = t.externalUrl;
+    link.style.display = 'inline-flex';
+  } else {
+    link.style.display = 'none';
+  }
+
+  spState.isPlaying = !!data.isPlaying;
+  document.getElementById('spPlayIcon').className = spState.isPlaying ? 'fas fa-pause' : 'fas fa-play';
+  document.getElementById('spStatusText').textContent = spState.isPlaying ? (spState.mode === 'free' ? 'Playing Preview' : 'Playing') : 'Paused';
+  const pulse = document.querySelector('.sp-pulse');
+  if (pulse) pulse.classList.toggle('paused', !spState.isPlaying);
+
+  if (spState.mode === 'premium') {
+    spState.progress = data.track.progress || 0;
+    spState.duration = data.track.duration || 0;
+    if (data.volume != null) {
+      document.getElementById('spVolumeSlider').value = data.volume;
+      document.getElementById('spVolumeVal').textContent = data.volume + '%';
+    }
+    updateProgress(spState.progress, spState.duration);
+    stopProgressTimer();
+    if (spState.isPlaying) startProgressTimer();
+  }
+}
+
+function fmtMs(ms) {
+  if (isNaN(ms) || ms < 0) return '0:00';
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function updateProgress(progress, duration) {
+  document.getElementById('spTimeProgress').textContent = fmtMs(progress);
+  document.getElementById('spTimeDuration').textContent  = fmtMs(duration);
+  const pct = duration > 0 ? Math.min(100, (progress / duration) * 100) : 0;
+  document.getElementById('spProgressFill').style.width = pct + '%';
+}
+
+function startProgressTimer() {
+  stopProgressTimer();
+  spProgressTimer = setInterval(() => {
+    if (!spState.isPlaying) return;
+    spState.progress = Math.min(spState.progress + 1000, spState.duration);
+    updateProgress(spState.progress, spState.duration);
+  }, 1000);
+}
+
+function stopProgressTimer() {
+  if (spProgressTimer) { clearInterval(spProgressTimer); spProgressTimer = null; }
+}
+
+// ── Player Controls ───────────────────────────────────────────
+document.getElementById('spPlayBtn').onclick = async () => {
+  if (spState.mode === 'free') {
+    if (!spState.currentTrack) return;
+    if (spState.isPlaying) {
+      spAudio.pause();
+      spState.isPlaying = false;
+    } else {
+      spAudio.play().catch(e => console.warn(e));
+      spState.isPlaying = true;
+    }
+    updateNowPlayingCard({ track: spState.currentTrack, isPlaying: spState.isPlaying });
+  } else {
+    // Premium Mode
+    if (spState.isPlaying) await fetch('/api/spotify/pause', { method: 'POST' });
+    else await fetch('/api/spotify/resume', { method: 'POST' });
+  }
+};
+
+document.getElementById('spPrevBtn').onclick = () => {
+  if (spState.mode === 'free') toast('Hanya preview, tidak ada previous.', 'info');
+  else fetch('/api/spotify/prev', { method: 'POST' });
+};
+
+document.getElementById('spNextBtn').onclick = () => {
+  if (spState.mode === 'free') fetch('/api/spotify/stop-preview', { method: 'POST' });
+  else fetch('/api/spotify/next', { method: 'POST' });
+};
+
+// Volume control
+let volTimer = null;
+document.getElementById('spVolumeSlider').oninput = function () {
+  const v = parseInt(this.value);
+  document.getElementById('spVolumeVal').textContent = v + '%';
+  if (spState.mode === 'free') {
+    spAudio.volume = v / 100;
+  } else {
+    clearTimeout(volTimer);
+    volTimer = setTimeout(() => {
+      fetch('/api/spotify/volume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ volume: v }),
+      });
+    }, 400);
+  }
+};
+
+// Auto-play toggle in player panel
+document.getElementById('spAutoPlayToggle').onchange = async function () {
+  const autoPlay = this.checked;
+  const mode         = document.getElementById('spMode').value;
+  const clientId     = document.getElementById('spClientId').value.trim();
+  const clientSecret = document.getElementById('spClientSecret').value.trim();
+  await fetch('/api/spotify/credentials', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode, clientId, clientSecret, autoPlay }),
+  });
+  toast(autoPlay ? 'Auto-play aktif' : 'Auto-play dimatikan', 'info');
+};
+
+// ── Search ────────────────────────────────────────────────────
+document.getElementById('spSearchBtn').onclick = spSearch;
+document.getElementById('spSearchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') spSearch();
+});
+
+async function spSearch() {
+  const q = document.getElementById('spSearchInput').value.trim();
+  if (!q) return;
+  const btn = document.getElementById('spSearchBtn');
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch('/api/spotify/search?' + new URLSearchParams({ q, limit: 6 }));
+    const d = await r.json();
+    btn.innerHTML = '<i class="fas fa-search"></i> Cari';
+    btn.disabled = false;
+
+    if (!d.ok) return toast('Search gagal: ' + d.error, 'error');
+    renderSpotifySearchResults(d.tracks || []);
+  } catch (e) {
+    btn.innerHTML = '<i class="fas fa-search"></i> Cari';
+    btn.disabled = false;
+    toast('Search error: ' + e.message, 'error');
+  }
+}
+
+function renderSpotifySearchResults(tracks) {
+  const el = document.getElementById('spSearchResults');
+  if (!tracks.length) {
+    el.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><span>Tidak ada hasil</span></div>';
+    return;
+  }
+  
+  window._spCurrentSearch = tracks;
+
+  el.innerHTML = tracks.map((t, idx) => `
+    <div class="sp-track-item">
+      ${t.albumArt
+        ? `<img class="sp-track-thumb" src="${escHtml(t.albumArt)}" alt="">`
+        : `<div class="sp-track-thumb-ph"><i class="fas fa-music"></i></div>`
+      }
+      <div class="sp-ti-info">
+        <div class="sp-ti-name">${escHtml(t.name)}</div>
+        <div class="sp-ti-meta">${escHtml(t.artists)} · ${escHtml(t.album)}</div>
+      </div>
+      ${t.externalUrl
+        ? `<a class="sp-preview-btn" href="${escHtml(t.externalUrl)}" target="_blank" title="Buka di Spotify"><i class="fab fa-spotify"></i></a>`
+        : ''
+      }
+      <button class="sp-ti-play-btn" onclick="spPlaySearchTrack(${idx})" title="Putar">
+        <i class="fas fa-play"></i>
+      </button>
+    </div>`
+  ).join('');
+}
+
+window.spPlaySearchTrack = async (idx) => {
+  const track = window._spCurrentSearch[idx];
+  if (spState.mode === 'free') {
+    if (!track.preview) return toast('Tidak ada preview audio gratis untuk lagu ini.', 'error');
+    const r = await fetch('/api/spotify/play-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ track }),
+    });
+    const d = await r.json();
+    if (d.ok) toast('▶️ Memutar preview lagu!', 'success');
+    else toast('Gagal putar: ' + d.error, 'error');
+  } else {
+    // Premium Mode
+    const r = await fetch('/api/spotify/play', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uri: track.uri }),
+    });
+    const d = await r.json();
+    if (d.ok) toast('▶️ Memutar lagu (Premium)!', 'success');
+    else toast('Gagal putar: ' + d.error, 'error');
+  }
+};
+
+// ── Devices (Premium Only) ────────────────────────────────────
+document.getElementById('spRefreshDevices').onclick = spLoadDevices;
+
+async function spLoadDevices() {
+  if (spState.mode !== 'premium') return;
+  const el = document.getElementById('spDevicesList');
+  el.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><span>Memuat...</span></div>';
+  try {
+    const r = await fetch('/api/spotify/devices');
+    const d = await r.json();
+    if (!d.ok || !d.devices.length) {
+      el.innerHTML = '<div class="empty-state"><i class="fas fa-laptop"></i><span>Buka Spotify di browser/desktop terlebih dahulu</span></div>';
+      return;
+    }
+    el.innerHTML = d.devices.map(dev => {
+      const icons = { Computer: 'fa-desktop', Smartphone: 'fa-mobile-alt', Speaker: 'fa-volume-up', TV: 'fa-tv', CastAudio: 'fa-cast' };
+      const icon = icons[dev.type] || 'fa-laptop';
+      return `
+        <div class="sp-device-item ${dev.is_active ? 'active-device' : ''}" onclick="spTransferTo('${dev.id}')">
+          <div class="sp-device-icon"><i class="fas ${icon}"></i></div>
+          <div class="sp-device-info">
+            <div class="sp-device-name">${escHtml(dev.name)}</div>
+            <div class="sp-device-type">${escHtml(dev.type || '')}</div>
+          </div>
+          ${dev.is_active ? '<span class="sp-device-badge">Active</span>' : ''}
+        </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><span>' + e.message + '</span></div>';
+  }
+}
+
+window.spTransferTo = async (deviceId) => {
+  if (spState.mode !== 'premium') return;
+  const r = await fetch('/api/spotify/transfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceId }),
+  });
+  const d = await r.json();
+  if (d.ok) { toast('Playback dipindah ke perangkat!', 'success'); spLoadDevices(); }
+  else toast('Gagal pindah: ' + d.error, 'error');
+};
+
+// ── Logout ────────────────────────────────────────────────────
+document.getElementById('spLogoutBtn').onclick = async () => {
+  if (!confirm('Disconnect Spotify?')) return;
+  if (spState.mode === 'free') spStopLocal();
+  await fetch('/api/spotify/logout', { method: 'POST' });
+  toast('Spotify disconnected', 'info');
+  updateSpotifyUI({ isAuthenticated: false });
+};
+
+// ── Queue Management ──────────────────────────────────────────
+socket.on('songQueue', data => {
+  renderQueue(data.queue || []);
+});
+
+function renderQueue(queue) {
+  const el = document.getElementById('spQueueList');
+  const clearBtn = document.getElementById('spClearQueueBtn');
+  
+  if (!queue || queue.length === 0) {
+    el.innerHTML = '<div class="empty-state"><i class="fas fa-music"></i><span>Antrean kosong</span></div>';
+    if (clearBtn) clearBtn.style.display = 'none';
+    return;
+  }
+  
+  if (clearBtn) clearBtn.style.display = 'inline-block';
+  
+  el.innerHTML = queue.map(item => {
+    const art = item.albumArt ? `<img class="sp-track-thumb" src="${escHtml(item.albumArt)}">` : `<div class="sp-track-thumb-ph"><i class="fas fa-music"></i></div>`;
+    const title = item.spotifyName || item.song;
+    const artist = item.spotifyArtist || 'Unknown Artist';
+    const req = item.requesterNick || item.requester || 'User';
+    
+    return `
+      <div class="sp-track-item">
+        ${art}
+        <div class="sp-ti-info">
+          <div class="sp-ti-name">${escHtml(title)}</div>
+          <div class="sp-ti-meta">${escHtml(artist)} · Req: @${escHtml(req)}</div>
+        </div>
+        <button class="sp-ti-play-btn" style="background:rgba(255,100,100,0.2); color:#ff6b6b;" onclick="removeFromQueue(${item.id})" title="Hapus">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>`;
+  }).join('');
+}
+
+window.removeFromQueue = async (id) => {
+  const r = await fetch(`/api/spotify/queue/${id}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.ok) toast('Lagu dihapus dari antrean', 'success');
+};
+
+document.getElementById('spClearQueueBtn').onclick = async () => {
+  if (!confirm('Bersihkan seluruh antrean?')) return;
+  const r = await fetch('/api/spotify/queue', { method: 'DELETE' });
+  const d = await r.json();
+  if (d.ok) toast('Antrean dibersihkan', 'success');
+};

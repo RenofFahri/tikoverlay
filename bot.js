@@ -275,7 +275,7 @@ function handleCommand(event) {
   }
 }
 
-function handleSongRequest(event, args) {
+async function handleSongRequest(event, args) {
   const io = global._io;
   const state = global._state;
   const song = args.trim();
@@ -283,11 +283,46 @@ function handleSongRequest(event, args) {
     io.emit('botReply', { user: event.user, msg: `@${event.nickname} → Tulis nama lagu setelah !sr, contoh: !sr Shape of You` });
     return;
   }
-  const entry = { id: Date.now(), requester: event.user, requesterNick: event.nickname, song };
+
+  log(`🎵 Song request: "${song}" by @${event.user}`);
+
+  // ── Spotify Integration ─────────────────────────────────────
+  const sp = global._spotify;
+  const spSettings = global._spotifySettings ? global._spotifySettings() : null;
+  let entry = { id: Date.now(), requester: event.user, requesterNick: event.nickname, song };
+
+  if (sp && spSettings && sp.isConfigured() && sp.getAuthState().isAuthenticated) {
+    try {
+      const tracks = await sp.searchTrack(song, 1);
+      if (tracks.length > 0) {
+        const track = tracks[0];
+        
+        // Populate entry with Spotify metadata
+        entry.spotifyUri    = track.uri;
+        entry.spotifyName   = track.name;
+        entry.spotifyArtist = track.artists;
+        entry.albumArt      = track.albumArt;
+        entry.externalUrl   = track.externalUrl;
+        
+        // Add to queue (Dashboard and Overlay will update)
+        state.songQueue.push(entry);
+        io.emit('songQueue', { queue: state.songQueue, nowPlaying: state.nowPlaying });
+
+        io.emit('botReply', { user: event.user, msg: `✅ @${event.nickname} Antrean ditambahkan: "${track.name}" (${track.artists}).` });
+        return; 
+      } else {
+        io.emit('botReply', { user: event.user, msg: `❌ Lagu "${song}" tidak ditemukan di Spotify.` });
+        return;
+      }
+    } catch (e) {
+      log(`⚠️ Spotify search error: ${e.message}`);
+    }
+  }
+
+  // Fallback: Add as raw text if Spotify search fails or is not connected
   state.songQueue.push(entry);
   io.emit('songQueue', { queue: state.songQueue, nowPlaying: state.nowPlaying });
-  io.emit('botReply', { user: event.user, msg: `🎵 @${event.nickname} request: "${song}" (no. ${state.songQueue.length} dalam antrian)` });
-  log(`🎵 Song request: "${song}" by @${event.user}`);
+  io.emit('botReply', { user: event.user, msg: `🎵 @${event.nickname} request: "${song}" (ditambahkan ke antrean)` });
 }
 
 function handleQueueCmd(event) {

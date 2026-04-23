@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Now Playing Overlay</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',sans-serif;background:transparent;overflow:hidden;height:100vh;display:flex;align-items:flex-start;padding:20px}
@@ -12,88 +12,191 @@ body{font-family:'Inter',sans-serif;background:transparent;overflow:hidden;heigh
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(13, 14, 20, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 10px 16px;
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
+  background: rgba(13, 14, 20, 0.88);
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  padding: 12px 16px 12px 12px;
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
   color: #fff;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(29,185,84,0.1);
   transform: translateX(-120%);
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
   opacity: 0;
-  max-width: 400px;
+  max-width: 420px;
+  min-width: 280px;
 }
 .np-widget.show {
   transform: translateX(0);
   opacity: 1;
 }
 
-.np-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #25f4ee, #fe2c55);
+/* Album Art */
+.np-album-art {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  animation: spin 4s linear infinite;
+  font-size: 22px;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
-.np-icon.paused {
-  animation: none;
-  background: rgba(255,255,255,0.2);
+.np-album-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.np-album-art.spinning {
+  animation: albumSpin 8s linear infinite;
+}
+@keyframes albumSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
-.np-info {
+/* Music bars animation */
+.np-bars {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+}
+.np-bar {
+  width: 3px;
+  background: #1db954;
+  border-radius: 2px;
+  animation: barAnim 0.8s ease infinite;
+}
+.np-bar:nth-child(1){height:8px;animation-delay:0s}
+.np-bar:nth-child(2){height:14px;animation-delay:.15s}
+.np-bar:nth-child(3){height:10px;animation-delay:.3s}
+.np-bar:nth-child(4){height:16px;animation-delay:.08s}
+@keyframes barAnim {
+  0%,100%{transform:scaleY(1)}
+  50%{transform:scaleY(.3)}
+}
+
+/* Content */
+.np-content {
   flex: 1;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.np-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .np-label {
-  font-size: 10px;
-  color: #a0a8c0;
+  font-size: 9px;
+  color: #1db954;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 2px;
-  font-weight: 600;
+  letter-spacing: 1px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
+.np-label::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: #1db954;
+  border-radius: 50%;
+  animation: pulse 1.2s ease infinite;
+}
+@keyframes pulse {
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:.4;transform:scale(.7)}
+}
+
 .np-song {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.np-artist {
+  font-size: 11px;
+  color: rgba(255,255,255,0.65);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .np-req {
-  font-size: 11px;
-  color: #25f4ee;
+  font-size: 10px;
+  color: #1db954;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Progress */
+.np-progress {
+  height: 3px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 99px;
+  overflow: hidden;
   margin-top: 2px;
+}
+.np-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1db954, #25f4ee);
+  border-radius: 99px;
+  transition: width 1s linear;
+  width: 0%;
 }
 
 /* THEMES */
-body.dark   .np-widget{background:rgba(13,14,20,.85);border-color:rgba(255,255,255,.08);}
-body.light  .np-widget{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.08);color:#111}
-body.light  .np-label{color:#666}
-body.light  .np-req{color:#fe2c55}
-body.neon   .np-widget{background:rgba(0,15,8,.85);border-color:#00ff88;color:#00ff88}
-body.neon   .np-req{color:#fff}
-body.glass  .np-widget{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);backdrop-filter:blur(12px);}
-body.minimal .np-widget{background:rgba(0,0,0,.7);border-left:3px solid #fff;border-radius:4px;}
-body.pink   .np-widget{background:rgba(60,0,35,.85);border-color:rgba(255,100,150,.2);color:#ffcce0}
+body.dark   .np-widget{background:rgba(13,14,20,.88);border-color:rgba(29,185,84,.25)}
+body.light  .np-widget{background:rgba(255,255,255,.92);border-color:rgba(29,185,84,.3);color:#111}
+body.light  .np-artist{color:#555}
+body.light  .np-req{color:#17a146}
+body.neon   .np-widget{background:rgba(0,15,8,.88);border-color:#00ff88;box-shadow:0 0 30px rgba(0,255,136,.2)}
+body.neon   .np-artist{color:#aaa}
+body.neon   .np-label{color:#00ff88}
+body.neon   .np-label::before{background:#00ff88}
+body.glass  .np-widget{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);backdrop-filter:blur(16px)}
+body.minimal .np-widget{background:rgba(0,0,0,.75);border:none;border-left:3px solid #1db954;border-radius:4px;box-shadow:none}
+body.pink   .np-widget{background:rgba(60,0,35,.88);border-color:rgba(255,100,150,.25);color:#ffcce0}
 body.pink   .np-req{color:#ff6496}
-
-@keyframes spin { 100% { transform: rotate(360deg); } }
-
+body.pink   .np-label{color:#ff6496}
+body.pink   .np-label::before{background:#ff6496}
+body.pink   .np-progress-fill{background:linear-gradient(90deg,#ff6496,#ff9ec8)}
 </style>
 </head>
 <body class="dark" id="overlayBody">
 
 <div class="np-widget" id="npWidget">
-  <div class="np-icon" id="npIcon">🎵</div>
-  <div class="np-info">
-    <div class="np-label">Now Playing</div>
+  <div class="np-album-art" id="npAlbumArt">
+    🎵
+    <div class="np-bars" id="npBars">
+      <div class="np-bar"></div>
+      <div class="np-bar"></div>
+      <div class="np-bar"></div>
+      <div class="np-bar"></div>
+    </div>
+  </div>
+  <div class="np-content">
+    <div class="np-top">
+      <div class="np-label" id="npLabel">Now Playing</div>
+    </div>
     <div class="np-song" id="npSong">Judul Lagu</div>
+    <div class="np-artist" id="npArtist"></div>
     <div class="np-req" id="npReq">Req: @user</div>
+    <div class="np-progress" id="npProgressWrap" style="display:none">
+      <div class="np-progress-fill" id="npProgressFill"></div>
+    </div>
   </div>
 </div>
 
@@ -103,21 +206,25 @@ const socket = io({
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
-  extraHeaders: {
-    'ngrok-skip-browser-warning': 'true'
-  }
+  extraHeaders: { 'ngrok-skip-browser-warning': 'true' }
 });
 let currentTheme = 'dark';
+let progressInterval = null;
+let currentProgress = 0;
+let currentDuration  = 0;
+let isPlaying = false;
 
 socket.on('init', d => {
   if(d.settings?.overlayTheme) applyTheme(d.settings.overlayTheme);
   updateWidget(d.nowPlaying);
 });
-socket.on('settings', s => {
-  if(s.overlayTheme) applyTheme(s.overlayTheme);
-});
-socket.on('songQueue', data => {
-  updateWidget(data.nowPlaying);
+socket.on('settings', s => { if(s.overlayTheme) applyTheme(s.overlayTheme); });
+socket.on('songQueue', data => updateWidget(data.nowPlaying));
+
+// Spotify now playing — takes priority
+socket.on('spotifyNowPlaying', data => {
+  if (!data || !data.track) return;
+  updateSpotifyWidget(data);
 });
 
 function applyTheme(t) {
@@ -126,19 +233,79 @@ function applyTheme(t) {
 
 function updateWidget(nowPlaying) {
   const widget = document.getElementById('npWidget');
-  const icon = document.getElementById('npIcon');
-  const song = document.getElementById('npSong');
-  const req = document.getElementById('npReq');
+  const song   = document.getElementById('npSong');
+  const artist = document.getElementById('npArtist');
+  const req    = document.getElementById('npReq');
+  const art    = document.getElementById('npAlbumArt');
+  const prog   = document.getElementById('npProgressWrap');
 
   if (nowPlaying) {
-    song.textContent = nowPlaying.song;
-    req.textContent = 'Req: @' + (nowPlaying.requesterNick || nowPlaying.requester);
-    icon.classList.remove('paused');
+    song.textContent   = nowPlaying.song || nowPlaying.spotifyName || '';
+    artist.textContent = nowPlaying.spotifyArtist || '';
+    req.textContent    = 'Req: @' + (nowPlaying.requesterNick || nowPlaying.requester || '');
+    
+    if (nowPlaying.albumArt) {
+      art.innerHTML = `<img src="${nowPlaying.albumArt}" alt="">
+        <div class="np-bars" id="npBars">
+          <div class="np-bar"></div><div class="np-bar"></div>
+          <div class="np-bar"></div><div class="np-bar"></div>
+        </div>`;
+    } else {
+      art.innerHTML = `🎵<div class="np-bars" id="npBars">
+        <div class="np-bar"></div><div class="np-bar"></div>
+        <div class="np-bar"></div><div class="np-bar"></div>
+      </div>`;
+    }
+
+    prog.style.display = 'none'; // no progress for non-Spotify
     widget.classList.add('show');
   } else {
     widget.classList.remove('show');
-    icon.classList.add('paused');
   }
+}
+
+function updateSpotifyWidget(data) {
+  const widget  = document.getElementById('npWidget');
+  const song    = document.getElementById('npSong');
+  const artist  = document.getElementById('npArtist');
+  const req     = document.getElementById('npReq');
+  const art     = document.getElementById('npAlbumArt');
+  const label   = document.getElementById('npLabel');
+  const prog    = document.getElementById('npProgressWrap');
+  const fill    = document.getElementById('npProgressFill');
+
+  if (!data.track) { widget.classList.remove('show'); return; }
+
+  song.textContent   = data.track.name || '';
+  artist.textContent = data.track.artists || '';
+  req.textContent    = '';
+
+  if (data.track.albumArt) {
+    art.innerHTML = `<img src="${data.track.albumArt}" alt="">
+      <div class="np-bars" id="npBars">
+        <div class="np-bar"></div><div class="np-bar"></div>
+        <div class="np-bar"></div><div class="np-bar"></div>
+      </div>`;
+  }
+
+  label.textContent = 'Now Playing via Spotify';
+  isPlaying = data.isPlaying;
+  currentProgress = data.track.progress || 0;
+  currentDuration  = data.track.duration || 1;
+
+  prog.style.display = 'block';
+  fill.style.width = Math.min(100, (currentProgress / currentDuration) * 100) + '%';
+
+  // local progress tick
+  clearInterval(progressInterval);
+  if (isPlaying) {
+    progressInterval = setInterval(() => {
+      currentProgress = Math.min(currentProgress + 1000, currentDuration);
+      fill.style.width = Math.min(100, (currentProgress / currentDuration) * 100) + '%';
+    }, 1000);
+  }
+
+  widget.classList.add('show');
 }
 </script>
 </body>

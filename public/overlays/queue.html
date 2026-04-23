@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Song Queue Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: transparent;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  padding: 20px;
+}
+
+.queue-widget {
+  background: rgba(13, 14, 20, 0.88);
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  color: #fff;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(29,185,84,0.1);
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: opacity 0.3s ease;
+}
+
+.queue-header {
+  padding: 12px 16px;
+  background: rgba(29, 185, 84, 0.15);
+  border-bottom: 1px solid rgba(29, 185, 84, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #1db954;
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 4px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+@keyframes slideIn {
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.queue-item-art {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+.queue-item-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.queue-item-info {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.queue-song-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+
+.queue-song-artist {
+  font-size: 11px;
+  color: #aaa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-req {
+  font-size: 10px;
+  color: #1db954;
+  font-weight: 600;
+  background: rgba(29, 185, 84, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  align-self: flex-start;
+}
+
+.empty-queue {
+  padding: 20px;
+  text-align: center;
+  color: #888;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* THEMES */
+body.light .queue-widget { background: rgba(255, 255, 255, 0.92); border-color: rgba(29, 185, 84, 0.3); color: #111; }
+body.light .queue-song-title { color: #111; }
+body.light .queue-song-artist { color: #555; }
+body.light .queue-item { background: rgba(0, 0, 0, 0.03); }
+
+body.neon .queue-widget { background: rgba(0, 15, 8, 0.88); border-color: #00ff88; box-shadow: 0 0 30px rgba(0, 255, 136, 0.2); }
+body.neon .queue-header, body.neon .queue-req { color: #00ff88; background: rgba(0, 255, 136, 0.1); }
+body.neon .queue-header { border-bottom-color: rgba(0, 255, 136, 0.2); }
+
+body.glass .queue-widget { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.25); backdrop-filter: blur(16px); }
+
+body.minimal .queue-widget { background: rgba(0, 0, 0, 0.75); border: none; border-top: 3px solid #1db954; border-radius: 4px; box-shadow: none; }
+
+body.pink .queue-widget { background: rgba(60, 0, 35, 0.88); border-color: rgba(255, 100, 150, 0.25); color: #ffcce0; }
+body.pink .queue-header, body.pink .queue-req { color: #ff6496; background: rgba(255, 100, 150, 0.1); }
+body.pink .queue-header { border-bottom-color: rgba(255, 100, 150, 0.2); }
+body.pink .queue-item { background: rgba(255, 255, 255, 0.05); }
+body.pink .queue-song-title { color: #fff; }
+body.pink .queue-song-artist { color: #ff9ec8; }
+</style>
+</head>
+<body class="dark" id="overlayBody">
+
+<div class="queue-widget" id="queueWidget" style="opacity: 0;">
+  <div class="queue-header">
+    <i class="fas fa-list-ul"></i> Antrean Lagu
+  </div>
+  <div class="queue-list" id="queueList">
+    <!-- Items will be injected here -->
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  extraHeaders: { 'ngrok-skip-browser-warning': 'true' }
+});
+
+socket.on('init', d => {
+  if (d.settings && d.settings.overlayTheme) {
+    document.getElementById('overlayBody').className = d.settings.overlayTheme;
+  }
+  updateQueue(d.songQueue || []);
+});
+
+socket.on('settings', s => { 
+  if (s.overlayTheme) {
+    document.getElementById('overlayBody').className = s.overlayTheme;
+  }
+});
+
+socket.on('songQueue', data => {
+  updateQueue(data.queue || []);
+});
+
+function updateQueue(queue) {
+  const listEl = document.getElementById('queueList');
+  const widget = document.getElementById('queueWidget');
+  
+  if (!queue || queue.length === 0) {
+    widget.style.opacity = '0';
+    setTimeout(() => { listEl.innerHTML = ''; }, 300);
+    return;
+  }
+  
+  widget.style.opacity = '1';
+  listEl.innerHTML = '';
+  
+  // Display up to 5 next songs
+  const displayQueue = queue.slice(0, 5);
+  
+  displayQueue.forEach((item, index) => {
+    const el = document.createElement('div');
+    el.className = 'queue-item';
+    el.style.animationDelay = `${index * 0.1}s`;
+    
+    const art = item.albumArt ? `<img src="${item.albumArt}">` : `<i class="fas fa-music"></i>`;
+    const title = item.spotifyName || item.song;
+    const artist = item.spotifyArtist || 'Unknown Artist';
+    
+    el.innerHTML = `
+      <div class="queue-item-art">${art}</div>
+      <div class="queue-item-info">
+        <div class="queue-song-title">${title}</div>
+        <div class="queue-song-artist">${artist}</div>
+        <div class="queue-req">Req: @${item.requesterNick || item.requester || 'User'}</div>
+      </div>
+    `;
+    listEl.appendChild(el);
+  });
+  
+  // If there are more than 5 songs in the queue
+  if (queue.length > 5) {
+    const moreEl = document.createElement('div');
+    moreEl.className = 'empty-queue';
+    moreEl.style.padding = '8px';
+    moreEl.textContent = `+ ${queue.length - 5} lagu lainnya...`;
+    listEl.appendChild(moreEl);
+  }
+}
+</script>
+</body>
+</html>

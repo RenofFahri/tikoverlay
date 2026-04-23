@@ -11,6 +11,7 @@ const { Server } = require('socket.io');
 const path      = require('path');
 const fs        = require('fs');
 const { startBot, stopBot, getBotState } = require('./bot');
+const spotify = require('./spotify');
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 let savedState = {};
@@ -55,6 +56,14 @@ const state = {
   songQueue    : [],      // [{ requester, song, id }]
   nowPlaying   : null,
   botCommands  : savedState.botCommands || [],      // custom commands [{trigger, response}]
+  spotifyNowPlaying: null, // live spotify track info
+  spotifySettings: savedState.spotifySettings || {
+    clientId    : '',
+    clientSecret: '',
+    autoPlay    : true,   // auto-play on !sr request
+    deviceId    : '',
+    redirectUri : '',
+  },
   settings     : {
     tts: { chat: true, gift: true, join: true, follow: true, welcome: true },
     ttsVoice: '', ttsRate: 1, ttsPitch: 1, ttsVolume: 1,
@@ -65,12 +74,41 @@ const state = {
   }
 };
 
+// Init Spotify with saved credentials
+(function initSpotify() {
+  const sp = state.spotifySettings;
+  if (sp.clientId && sp.clientSecret) {
+    const PORT2 = process.env.PORT || 3000;
+    spotify.init({
+      mode        : sp.mode || 'free',
+      clientId    : sp.clientId,
+      clientSecret: sp.clientSecret,
+      redirectUri : sp.redirectUri || `http://localhost:${PORT2}/spotify/callback`,
+    });
+    if (savedState.spotifyTokens) {
+      spotify.setTokens(
+        savedState.spotifyTokens.access,
+        savedState.spotifyTokens.refresh,
+        savedState.spotifyTokens.expiresIn || 3600
+      );
+    }
+  }
+})();
+
 function saveData() {
   try {
+    const authState = spotify.getAuthState();
     const dataToSave = {
-      settings: state.settings,
-      botCommands: state.botCommands,
-      giftGoal: state.giftGoal
+      settings        : state.settings,
+      botCommands     : state.botCommands,
+      giftGoal        : state.giftGoal,
+      spotifySettings : state.spotifySettings,
+      // Save tokens only if authenticated
+      spotifyTokens   : authState.isAuthenticated ? {
+        access   : null, // don't save access token (ephemeral)
+        refresh  : global._spotifyRefreshToken || null,
+        expiresIn: 3600,
+      } : null,
     };
     fs.writeFileSync(DATA_FILE, JSON.stringify(dataToSave, null, 2));
   } catch(e) {
@@ -178,25 +216,274 @@ app.post('/api/settings', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Spotify API Routes (Dual Mode) ──────────────────────────
+
+// Save Spotify credentials & set mode
+app.post('/api/spotify/credentials', (req, res) => {
+  const { mode, clientId, clientSecret, autoPlay, deviceId, redirectUri } = req.body;
+  state.spotifySettings.mode         = mode || 'free';
+  state.spotifySettings.clientId     = clientId     || '';
+  state.spotifySettings.clientSecret = clientSecret || '';
+  state.spotifySettings.autoPlay     = autoPlay !== false;
+  state.spotifySettings.deviceId     = deviceId || '';
+  
+  const PORT2 = process.env.PORT || 3000;
+  state.spotifySettings.redirectUri  = redirectUri || `http://localhost:${PORT2}/spotify/callback`;
+
+  spotify.init({
+    mode: state.spotifySettings.mode,
+    clientId,
+    clientSecret,
+    redirectUri: state.spotifySettings.redirectUri,
+  });
+  saveData();
+  
+  if (state.spotifySettings.mode === 'free') {
+    spotify.ensureToken().then(() => {
+      io.emit('spotifyStatus', { ...spotify.getAuthState(), isConfigured: true, settings: state.spotifySettings });
+      res.json({ ok: true });
+    }).catch(e => {
+      res.json({ ok: false, error: e.message });
+    });
+  } else {
+    res.json({ ok: true }); // Need OAuth login next
+  }
+});
+
+// Get Spotify state
+app.get('/api/spotify/status', (req, res) => {
+  res.json({
+    ...spotify.getAuthState(),
+    isConfigured   : spotify.isConfigured(),
+    settings       : state.spotifySettings,
+    nowPlaying     : state.spotifyNowPlaying,
+  });
+});
+
+// Start OAuth (Premium)
+app.get('/spotify/login', (req, res) => {
+  if (!spotify.isConfigured()) return res.status(400).send('Spotify credentials not set');
+  res.redirect(spotify.getAuthUrl());
+});
+
+// OAuth callback (Premium)
+app.get('/spotify/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) {
+    return res.send(`<script>window.opener?.postMessage({spotifyAuth:'error',error:'${error||'cancelled'}'},'*');window.close();</script>`);
+  }
+  try {
+    await spotify.exchangeCode(code);
+    saveData(); // if tokens were persisted, we would save here
+    io.emit('spotifyStatus', { ...spotify.getAuthState(), isConfigured: true, settings: state.spotifySettings });
+    res.send(`<html><body style="background:#111;color:#1db954;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:16px">
+      <div style="font-size:48px">✅</div>
+      <h2 style="margin:0">Spotify Premium Terhubung!</h2>
+      <p style="color:#aaa">Jendela ini akan menutup otomatis...</p>
+      <script>setTimeout(()=>{window.close()},2000);window.opener?.postMessage({spotifyAuth:'success'},'*');</script>
+    </body></html>`);
+  } catch (e) {
+    res.send(`<script>window.opener?.postMessage({spotifyAuth:'error',error:'${e.message}'},'*');window.close();</script>`);
+  }
+});
+
+// Logout / Disconnect
+app.post('/api/spotify/logout', (req, res) => {
+  spotify.clearTokens();
+  state.spotifySettings.clientId = '';
+  state.spotifySettings.clientSecret = '';
+  state.spotifyNowPlaying = null;
+  saveData();
+  io.emit('spotifyStatus', { isAuthenticated: false, isConfigured: false });
+  io.emit('spotifyStopPreview');
+  res.json({ ok: true });
+});
+
+// Clear queue
+app.delete('/api/spotify/queue', (req, res) => {
+  state.songQueue = [];
+  io.emit('songQueue', { queue: state.songQueue, nowPlaying: state.nowPlaying });
+  res.json({ ok: true });
+});
+
+// Remove song from queue
+app.delete('/api/spotify/queue/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  state.songQueue = state.songQueue.filter(s => s.id !== id);
+  io.emit('songQueue', { queue: state.songQueue, nowPlaying: state.nowPlaying });
+  res.json({ ok: true });
+});
+
+// Search tracks
+app.get('/api/spotify/search', async (req, res) => {
+  const { q, limit } = req.query;
+  if (!q) return res.json({ ok: false, error: 'Query required' });
+  try {
+    const tracks = await spotify.searchTrack(q, parseInt(limit) || 6);
+    res.json({ ok: true, tracks });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// Play preview (Free Mode - local audio)
+app.post('/api/spotify/play-preview', (req, res) => {
+  const { track } = req.body;
+  if (!track) return res.json({ ok: false, error: 'Track required' });
+  state.spotifyNowPlaying = { track, isPlaying: true };
+  io.emit('spotifyPlayPreview', track);
+  res.json({ ok: true });
+});
+
+// Stop preview (Free Mode)
+app.post('/api/spotify/stop-preview', (req, res) => {
+  state.spotifyNowPlaying = null;
+  io.emit('spotifyStopPreview');
+  res.json({ ok: true });
+});
+
+// Play (Premium)
+app.post('/api/spotify/play', async (req, res) => {
+  const { uri, deviceId } = req.body;
+  if (!uri) return res.json({ ok: false, error: 'URI required' });
+  try {
+    await spotify.playTrack(uri, deviceId || state.spotifySettings.deviceId || undefined);
+    setTimeout(broadcastSpotifyState, 1000);
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Pause (Premium)
+app.post('/api/spotify/pause', async (req, res) => {
+  try {
+    await spotify.pause(state.spotifySettings.deviceId || undefined);
+    setTimeout(broadcastSpotifyState, 500);
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Resume (Premium)
+app.post('/api/spotify/resume', async (req, res) => {
+  try {
+    await spotify.resume(state.spotifySettings.deviceId || undefined);
+    setTimeout(broadcastSpotifyState, 500);
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Next (Premium)
+app.post('/api/spotify/next', async (req, res) => {
+  try {
+    await spotify.nextTrack(state.spotifySettings.deviceId || undefined);
+    setTimeout(broadcastSpotifyState, 1200);
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Prev (Premium)
+app.post('/api/spotify/prev', async (req, res) => {
+  try {
+    await spotify.prevTrack(state.spotifySettings.deviceId || undefined);
+    setTimeout(broadcastSpotifyState, 1200);
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Volume (Premium)
+app.post('/api/spotify/volume', async (req, res) => {
+  const { volume } = req.body;
+  try {
+    await spotify.setVolume(parseInt(volume), state.spotifySettings.deviceId || undefined);
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Devices (Premium)
+app.get('/api/spotify/devices', async (req, res) => {
+  try {
+    const devices = await spotify.getDevices();
+    res.json({ ok: true, devices });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Transfer (Premium)
+app.post('/api/spotify/transfer', async (req, res) => {
+  const { deviceId } = req.body;
+  try {
+    await spotify.transferPlayback(deviceId);
+    state.spotifySettings.deviceId = deviceId;
+    saveData();
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Broadcast spotify state to all sockets (Premium polling)
+async function broadcastSpotifyState() {
+  if (state.spotifySettings.mode !== 'premium') return;
+  try {
+    const data = await spotify.getPlaybackState();
+    if (data) {
+      state.spotifyNowPlaying = data;
+      io.emit('spotifyNowPlaying', data);
+    }
+  } catch (_) {}
+}
+
+// Expose for bot.js
+global._spotify             = spotify;
+global._spotifySettings     = () => state.spotifySettings;
+global._io                  = io;
+global._state               = state;
+global._broadcastSpotify    = broadcastSpotifyState;
+
+// Poll Spotify every 2s when authenticated in Premium mode
+setInterval(async () => {
+  const auth = spotify.getAuthState();
+  if (auth.mode === 'premium' && auth.isAuthenticated) {
+    await broadcastSpotifyState();
+  }
+}, 2000);
+
 // Test Alert
 app.post('/api/test-alert', (req, res) => {
-  const { type } = req.query; // Ambil tipe dari URL: ?type=join atau ?type=follow
+  const { type } = req.query;
+  const dummy = { 
+    nickname: 'User_Testing', 
+    uniqueId: 'usertesting', 
+    profilePictureUrl: 'https://p16-sign-va.tiktokcdn.com/tos-maliva-avt-0068/7331575836486008837~c5_100x100.jpeg' 
+  };
   
   let mockEvent = {
     type: type || 'gift',
-    nickname: 'User_Testing',
-    user: 'usertesting',
+    ...dummy,
     ts: Date.now()
   };
 
-  if (mockEvent.type === 'gift') {
-    mockEvent.gift = 'Mawar';
-    mockEvent.count = Math.floor(Math.random() * 10) + 1;
-    mockEvent.diamonds = 1;
-    mockEvent.giftImg = 'https://p16-sign-va.tiktokcdn.com/obj/tiktokaudio/68d6015a13c9bb2836~c5_100x100.jpeg'; 
+  if (type === 'gift') {
+    io.emit('gift', { ...dummy, giftName: 'Rose', giftPictureUrl: 'https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/ebaad51ce9cc503f56ceb24cba4ba8ea~tplv-obj.png', diamondCount: 1, repeatCount: 10 });
+  } else if (type === 'join') {
+    io.emit('join', dummy);
+  } else if (type === 'follow') {
+    io.emit('follow', dummy);
+  } else if (type === 'song') {
+    io.emit('spotifyNowPlaying', {
+      track: {
+        name: "Dummy Song Preview",
+        artists: "Virtual Band",
+        albumArt: "https://i.scdn.co/image/ab67616d0000b27341e31d6ea1d493dd77933ee5"
+      },
+      isPlaying: true
+    });
+  } else if (type === 'queue') {
+    io.emit('songQueue', {
+      queue: [
+        { id: 1, spotifyName: "First Dummy Track", spotifyArtist: "Artist One", requesterNick: "viewer1", albumArt: "https://i.scdn.co/image/ab67616d0000b27341e31d6ea1d493dd77933ee5" },
+        { id: 2, spotifyName: "Second Awesome Song", spotifyArtist: "Artist Two", requesterNick: "viewer2", albumArt: "https://i.scdn.co/image/ab67616d0000b27341e31d6ea1d493dd77933ee5" },
+        { id: 3, spotifyName: "Third Cool Beat", spotifyArtist: "Artist Three", requesterNick: "viewer3", albumArt: "https://i.scdn.co/image/ab67616d0000b27341e31d6ea1d493dd77933ee5" }
+      ],
+      nowPlaying: null
+    });
   }
-
-  io.emit('alertEvent', mockEvent);
   res.json({ ok: true });
 });
 
@@ -234,6 +521,11 @@ io.on('connection', (socket) => {
     settings    : state.settings,
     chatLog     : state.chatLog.slice(-50),
     giftLog     : state.giftLog.slice(-20),
+    spotifyStatus: { 
+      ...spotify.getAuthState(), 
+      isConfigured: spotify.isConfigured(), 
+      settings: state.spotifySettings 
+    }
   });
 });
 
@@ -269,6 +561,7 @@ srv.listen(PORT, () => {
   console.log(`║   Gift OVL  : http://localhost:${PORT}/overlay/gift  ║`);
   console.log(`║   LBoard OVL: http://localhost:${PORT}/overlay/leaderboard ║`);
   console.log(`║   Song OVL  : http://localhost:${PORT}/overlays/song.html ║`);
+  console.log(`║   Queue OVL : http://localhost:${PORT}/overlays/queue.html║`);
   console.log(`║   QR OVL    : http://localhost:${PORT}/overlays/qr.html ║`);
   console.log(`║   Goal OVL  : http://localhost:${PORT}/overlays/goal.html ║`);
   console.log('╚══════════════════════════════════════════════╝');
